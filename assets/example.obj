@@ -1,0 +1,24 @@
+# Cross with Segmented Vertical Lines (Scaled and Clockwise)
+#
+# Contains the original scaled cross (12 vertices)
+# plus four thin vertical rectangles in the "quadrants" (24 new vertices).
+
+# --- Scaled Cross (12 vertices) ---
+
+# Vertical Bar
+v -0.16667  0.50000  0.0
+v -0.16667 -0.50000  0.0
+v  0.16667 -0.50000  0.0
+v -0.16667  0.50000  0.0
+v  0.16667 -0.50000  0.0
+v  0.16667  0.50000  0.0
+
+# Horizontal Bar
+v -0.50000  0.16667  0.0
+v -0.50000 -0.16667  0.0
+v  0.50000 -0.16667  0.0
+v -0.50000  0.16667  0.0
+v  0.50000 -0.16667  0.0
+v  0.50000  0.16667  0.0
+
+
