@@ -8,7 +8,6 @@
 #include <sys/types.h>
 #include <vector>
 #include <vulkan/vulkan_core.h>
-
 const int WIDTH = 800;
 const int HEIGHT = 600;
 
@@ -29,7 +28,7 @@ static std::vector<char> readFile(const std::string &filename) {
 }
 
 void VulkanApplication::run() {
-  window = std::make_unique<Window>(WIDTH, HEIGHT, "Vulkan App");
+  window = std::make_unique<Window>(WIDTH, HEIGHT, "Vulkan OBJ Preview");
   initVulkan();
   mainLoop();
   cleanup();

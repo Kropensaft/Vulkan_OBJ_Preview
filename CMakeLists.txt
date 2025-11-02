@@ -17,12 +17,7 @@ find_package(Vulkan REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
 
 # List all source files from the src directory
-set(SOURCES
-    src/main.cpp
-    src/Window.cpp
-    src/VulkanApplication.cpp
-    src/FileParser.cpp
-  )
+file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 # Create the executable target
 add_executable(${PROJECT_NAME} ${SOURCES})
