@@ -1,13 +1,31 @@
 #include "InputController.h"
 
-void InputController::set_lastMousePos(glm::dvec2 &pos) {
-  m_lastMousePos = pos;
+InputController::InputController(Window &window, Camera &camera)
+    : m_window(window), m_camera(camera) {
+  glfwSetInputMode(m_window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
-void InputController::set_lastMousePosX(double posX) {
-  m_lastMousePos.x = posX;
-}
+void InputController::processInput(float deltaTime) {
+  GLFWwindow *glfwWindow = m_window.getGLFWwindow();
 
-void InputController::set_lastMousePosY(double posY) {
-  m_lastMousePos.y = posY;
+  if (glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+    glfwSetWindowShouldClose(glfwWindow, true);
+  }
+
+  double xpos, ypos;
+  glfwGetCursorPos(glfwWindow, &xpos, &ypos);
+
+  if (m_firstMouse) {
+    m_lastX = xpos;
+    m_lastY = ypos;
+    m_firstMouse = false;
+  }
+
+  float xoffset = xpos - m_lastX;
+  float yoffset = m_lastY - ypos;
+
+  m_lastX = xpos;
+  m_lastY = ypos;
+
+  m_camera.UpdateCamera(glfwWindow, xoffset, yoffset, deltaTime);
 }

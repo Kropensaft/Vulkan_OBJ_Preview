@@ -65,14 +65,23 @@ void VulkanApplication::initVulkan() {
 }
 
 void VulkanApplication::mainLoop() {
-  InputController ic;
+  // Vytvoříme instanci InputControlleru a propojíme ho s oknem a kamerou
+  InputController inputController(*window, camera);
+
+  float deltaTime = 0.0f;
+  float lastFrame = 0.0f;
 
   while (!window->shouldClose()) {
+    float currentFrame = glfwGetTime();
+    deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
+
     glfwPollEvents();
 
-    // camera.UpdateCamera(viewport);
-    updateCameraUniformBuffer();
+    // V každém snímku zavoláme jedinou funkci, která se o vše postará
+    inputController.processInput(deltaTime);
 
+    updateCameraUniformBuffer();
     drawFrame();
   }
   vkDeviceWaitIdle(device);
@@ -630,40 +639,11 @@ void VulkanApplication::createCameraUniformBuffer() {
 }
 void VulkanApplication::updateCameraUniformBuffer() {
   UniformBufferObject ubo{};
-
-  // --- START OF HARD-CODED TEST DATA ---
-
-  // 1. Manually create a simple, known-good View Matrix.
-  //    We are placing the camera at (2, 2, 2) and looking at the origin (0, 0, 0).
-  //    This completely bypasses the camera.GetViewMatrix() call.
-  ubo.view = glm::lookAt(
-      glm::vec3(2.0f, 2.0f, 2.0f), // Eye position
-      glm::vec3(0.0f, 0.0f, 0.0f), // Center point to look at
-      glm::vec3(0.0f, 1.0f, 0.0f)  // Up vector
-  );
-
-  // 2. Manually create a known-good Projection Matrix.
-  //    Using a very wide near/far plane to avoid any clipping issues.
-  ubo.proj = glm::perspective(
-      glm::radians(45.0f),
-      swapChainExtent.width / (float)swapChainExtent.height,
-      0.1f,
-      100.0f);
-
-  // 3. Apply the mandatory Vulkan Y-Flip.
+  ubo.view = camera.GetViewMatrix();
+  ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
   ubo.proj[1][1] *= -1;
 
-  // --- END OF HARD-CODED TEST DATA ---
-
-  // 4. Copy the entire struct to the GPU buffer.
   memcpy(cameraUniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
-
-  // Add a simple debug print to ensure this loop is running.
-  // This will print "TESTING..." to your console every ~60 frames.
-  static int debugFrame = 0;
-  if (debugFrame++ % 60 == 0) {
-    std::cout << "TESTING..." << std::endl;
-  }
 }
 
 void VulkanApplication::createDescriptorPool() {
@@ -733,16 +713,27 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
   renderPassInfo.pClearValues = &clearColor;
 
   vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+  // 1. Bind the pipeline first. This tells the GPU which shader program to use.
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
+  // 2. Bind the descriptor sets. This provides the uniform data (like your camera matrices) to the shader.
+  vkCmdBindDescriptorSets(
+      commandBuffer,
+      VK_PIPELINE_BIND_POINT_GRAPHICS,
+      pipelineLayout,
+      0,                             // The 'set' number in the shader (layout(set=0, ...))
+      1,                             // We are binding one set
+      &descriptorSets[currentFrame], // The specific descriptor set for this frame
+      0, nullptr);
+
+  // 3. Bind the geometry buffers.
   VkBuffer vertexBuffers[] = {vertexBuffer};
   VkDeviceSize offsets[] = {0};
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
   vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
-
+  // 4. Issue the draw call. The GPU now has everything it needs.
   vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
   vkCmdEndRenderPass(commandBuffer);

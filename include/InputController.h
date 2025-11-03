@@ -1,22 +1,22 @@
 #ifndef INPUT_CONTROLLER_H
 #define INPUT_CONTROLLER_H
 
-#include "glm/glm.hpp"
+#include "CameraController.h"
+#include "Window.h"
 
 class InputController {
 public:
-  InputController() = default;
+  InputController(Window &window, Camera &camera);
 
-  glm::dvec2 get_lastMousePos() const;
-  void set_lastMousePos(glm::dvec2 &);
-  void set_lastMousePosX(double);
-  void set_lastMousePosY(double);
+  void processInput(float deltaTime);
 
 private:
-  glm::dvec2 m_lastMousePos = {0, 0};
+  Window &m_window;
+  Camera &m_camera;
+
+  bool m_firstMouse = true;
+  double m_lastX = 0.0;
+  double m_lastY = 0.0;
 };
 
-inline glm::dvec2 InputController::get_lastMousePos() const {
-  return m_lastMousePos;
-}
-#endif // !INPUT_CONTROLLER_H
+#endif // INPUT_CONTROLLER_H

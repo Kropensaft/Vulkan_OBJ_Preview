@@ -1,4 +1,6 @@
 #include "CameraController.h"
+#include "InputController.h"
+#include "Storage.h"
 #include <iostream>
 
 Camera::Camera(glm::vec3 &&eye, glm::vec3 &&lookat, glm::vec3 &&upVector)
@@ -28,27 +30,36 @@ void Camera::UpdateViewMatrix() {
   m_viewMatrix = glm::lookAt(m_eye, m_lookAt, m_upVector);
 }
 
-void Camera::UpdateCamera(const VkViewport &viewport) {
-  // For now, let's implement a simple rotating camera for testing
-  static float time = 0.0f;
-  time += 0.01f; // Small increment for smooth rotation
+void Camera::UpdateCamera(GLFWwindow *window, float xoffset, float yoffset, float deltaTime) {
+  float sensitivity = 0.5f;
+  float xAngle = xoffset * sensitivity * deltaTime;
+  float yAngle = yoffset * sensitivity * deltaTime;
 
-  // Simple orbit around the origin
-  float radius = 5.0f;
-  float camX = sin(time) * radius;
-  float camZ = cos(time) * radius;
+  glm::vec4 position(m_eye.x, m_eye.y, m_eye.z, 1);
+  glm::vec4 pivot(m_lookAt.x, m_lookAt.y, m_lookAt.z, 1);
 
-  m_eye = glm::vec3(camX, 2.0f, camZ);
-  m_lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
-  m_upVector = glm::vec3(0.0f, 1.0f, 0.0f);
+  float cosAngle = dot(GetViewDir(), m_upVector);
+  if (cosAngle * (yAngle > 0 ? 1 : -1) > 0.99f) {
+    yAngle = 0;
+  }
+
+  glm::mat4 rotationMatrixX = glm::rotate(glm::mat4(1.0f), xAngle, m_upVector);
+  position = (rotationMatrixX * (position - pivot)) + pivot;
+
+  glm::mat4 rotationMatrixY = glm::rotate(glm::mat4(1.0f), yAngle, GetRightVector());
+  m_eye = (rotationMatrixY * (position - pivot)) + pivot;
+
+  float zoomSpeed = 2.5f;
+  glm::vec3 viewDir = GetViewDir();
+
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+    m_eye += viewDir * zoomSpeed * deltaTime;
+  }
+  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+    m_eye -= viewDir * zoomSpeed * deltaTime;
+  }
 
   UpdateViewMatrix();
-
-  // Print camera position every 60 frames for debugging
-  static int frameCount = 0;
-  if (frameCount++ % 60 == 0) {
-    printf("Camera position: (%.2f, %.2f, %.2f)\n", m_eye.x, m_eye.y, m_eye.z);
-  }
 }
 
 glm::mat4x4 Camera::GetViewMatrix() const {

@@ -1,6 +1,8 @@
 #ifndef CAMERA_CONTROLLER_H
 #define CAMERA_CONTROLLER_H
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -23,7 +25,7 @@ public:
   void SetCameraView(glm::vec3 eye, glm::vec3 lookat, glm::vec3 up);
   void UpdateViewMatrix();
 
-  void UpdateCamera(const VkViewport &);
+  void UpdateCamera(GLFWwindow *window, float xoffset, float yoffset, float deltaTime);
   void CameraInit();
 
 private:

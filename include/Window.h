@@ -14,6 +14,7 @@ public:
   Window(const Window &) = delete;
   Window &operator=(const Window &) = delete;
 
+  GLFWwindow *getGLFWWindow();
   bool shouldClose() const { return glfwWindowShouldClose(window); }
   void createWindowSurface(VkInstance instance, VkSurfaceKHR *surface);
 
@@ -23,6 +24,7 @@ public:
   bool isMouseButtonPressed(int button) const {
     return (button >= 0 && button < GLFW_MOUSE_BUTTON_LAST) ? mouseButtons[button] : false;
   }
+  GLFWwindow *getGLFWwindow() const { return window; }
 
 private:
   void initWindow();

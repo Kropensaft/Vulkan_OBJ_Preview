@@ -1,6 +1,7 @@
 #ifndef VULKAN_APP_H
 #define VULKAN_APP_H
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "CameraController.h"
 #include "Window.h"
 #include <GLFW/glfw3.h>
@@ -41,9 +42,10 @@ struct Vertex {
   }
 };
 
+// FIX: DON'T CHANGE THE ORDER UNLESS YOU WANT TO EXPERIENCE A WORLD OF PAIN
 struct UniformBufferObject {
-  glm::mat4 proj;
   glm::mat4 view;
+  glm::mat4 proj;
 };
 /*
 INFO:
