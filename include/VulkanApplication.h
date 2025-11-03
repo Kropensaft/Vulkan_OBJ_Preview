@@ -1,13 +1,14 @@
 #ifndef VULKAN_APP_H
 #define VULKAN_APP_H
 
+#include "CameraController.h"
 #include "Window.h"
 #include <GLFW/glfw3.h>
 #include <array>
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
-
+#include <vulkan/vulkan_core.h>
 struct Vertex {
   glm::vec3 pos;
   glm::vec3 color;
@@ -59,6 +60,9 @@ public:
   static std::vector<Vertex> vertices;
   static std::vector<uint32_t> indices;
 
+  // INFO: Getters and setters
+  const VkViewport &getViewPortRef();
+
 private:
   void initVulkan();
   void mainLoop();
@@ -85,12 +89,14 @@ private:
 
   std::unique_ptr<Window> window;
 
+  Camera camera;
+
   VkInstance instance;
   VkSurfaceKHR surface;
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
   VkDevice device;
   VkQueue graphicsQueue;
-
+  VkViewport viewport;
   VkSwapchainKHR swapChain;
   std::vector<VkImage> swapChainImages;
   VkFormat swapChainImageFormat;

@@ -49,6 +49,7 @@ void VulkanApplication::initVulkan() {
   FileParser parser;
   parser.parse_OBJ("../assets/teapot.obj");
 
+  camera.CameraInit();
   createVertexBuffer();
   createIndexBuffer();
   createCommandBuffers();
@@ -58,6 +59,9 @@ void VulkanApplication::initVulkan() {
 void VulkanApplication::mainLoop() {
   while (!window->shouldClose()) {
     glfwPollEvents();
+
+    camera.UpdateCamera(viewport);
+
     drawFrame();
   }
   vkDeviceWaitIdle(device);
@@ -381,7 +385,6 @@ void VulkanApplication::createGraphicsPipeline() {
   inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
   inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-  VkViewport viewport{};
   viewport.x = 0.0f;
   viewport.y = 0.0f;
   viewport.width = (float)swapChainExtent.width;
@@ -585,4 +588,8 @@ void VulkanApplication::createIndexBuffer() {
   vkMapMemory(device, indexBufferMemory, 0, bufferInfo.size, 0, &data);
   memcpy(data, indices.data(), (size_t)bufferInfo.size);
   vkUnmapMemory(device, indexBufferMemory);
+}
+
+const VkViewport &VulkanApplication::getViewPortRef() {
+  return viewport;
 }

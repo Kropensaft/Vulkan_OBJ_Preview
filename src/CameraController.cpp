@@ -1,10 +1,22 @@
 #include "CameraController.h"
+#include "InputController.h"
+#include "Storage.h"
 
 void Camera::SetCameraView(glm::vec3 eye, glm::vec3 lookat, glm::vec3 up) {
   m_eye = std::move(eye);
   m_lookAt = std::move(lookat);
   m_upVector = std::move(up);
   UpdateViewMatrix();
+}
+
+void Camera::CameraInit() {
+  float xPos = 100.0f;
+  float yPos = 50.0f;
+  float yDeltaAngle = 0.0f;
+  glm::vec3 eye(0.0f, 0.0f, 5.0f);
+  glm::vec3 lookat(0.0f, 0.0f, 0.0f);
+  glm::vec3 up(0.0f, 1.0f, 0.0f);
+  SetCameraView(eye, lookat, up);
 }
 
 void Camera::UpdateViewMatrix() {
@@ -16,20 +28,31 @@ Camera::Camera(glm::vec3 &&eye, glm::vec3 &&lookat, glm::vec3 &&upVector) : m_ey
   UpdateViewMatrix();
 }
 
-/*NOTE: Prepare the arcball camera's main Update function, algorithm is well known, we just need to implement the IO
+// NOTE: Prepare the arcball camera's main Update function, algorithm is well known, we just need to implement the IO
 
-void Camera::UpdateCamera() {
+void Camera::UpdateCamera(const VkViewport &viewport) {
+  InputController IC;
+
   glm::vec4 position(GetEye().x, GetEye().y, GetEye().z, 1);
   glm::vec4 pivot(GetLookAt().x, GetLookAt().y, GetLookAt().z, 1);
 
-  float deltaAngleX = (2 * M_PI / viewportWidth);
-  float deltaAngleY = (M_PI / viewportHeight);
-  float xAngle = (m_lastMousePos.x - xPos) * deltaAngleX;
-  float yAngle = (m_lastMousePos.y - yPos) * deltaAngleY;
+  // VÝRAZNĚJŠÍ ÚHLY PRO TEST
+  float deltaAngleX = (2 * M_PI / viewport.width) * 10.0f; // 10x citlivější
+  float deltaAngleY = (M_PI / viewport.height) * 10.0f;    // 10x citlivější
+
+  // Simulujte pohyb myši - kamera se bude pomalu otáčet
+  static float time = 0.0f;
+  time += 0.016f; // Přibližně 60 FPS
+
+  float mouseX = sin(time) * 100.0f;       // Osciluje mezi -100 a 100
+  float mouseY = cos(time * 0.7f) * 50.0f; // Osciluje pomaleji
+
+  float xAngle = (mouseX - xPos) * deltaAngleX;
+  float yAngle = (mouseY - yPos) * deltaAngleY;
 
   float cosAngle = dot(GetViewDir(), m_upVector);
-  if (cosAngle * sgn(yDeltaAngle) > 0.99f)
-    yDeltaAngle = 0;
+  if (cosAngle * sgn(yAngle) > 0.99f)
+    yAngle = 0;
 
   glm::mat4x4 rotationMatrixX(1.0f);
   rotationMatrixX = glm::rotate(rotationMatrixX, xAngle, m_upVector);
@@ -41,10 +64,17 @@ void Camera::UpdateCamera() {
 
   SetCameraView(finalPosition, GetLookAt(), m_upVector);
 
-  m_lastMousePos.x = xPos;
-  m_lastMousePos.y = yPos;
+  // Aktualizujte pozici pro příští frame
+  xPos = mouseX;
+  yPos = mouseY;
+
+  // Výpis pro debug (můžete odstranit)
+  static int frameCount = 0;
+  if (frameCount++ % 60 == 0) {
+    printf("Camera position: (%.2f, %.2f, %.2f)\n",
+           finalPosition.x, finalPosition.y, finalPosition.z);
+  }
 }
-*/
 glm::mat4x4 Camera::GetViewMatrix() const {
   return m_viewMatrix;
 }
