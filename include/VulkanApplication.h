@@ -5,10 +5,14 @@
 #include "Window.h"
 #include <GLFW/glfw3.h>
 #include <array>
+#include <cstdint>
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
 #include <vulkan/vulkan_core.h>
+
+constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
 struct Vertex {
   glm::vec3 pos;
   glm::vec3 color;
@@ -35,6 +39,10 @@ struct Vertex {
 
     return attributeDescriptions;
   }
+};
+
+struct CameraBuffer {
+  glm::mat4 view;
 };
 
 /*
@@ -86,10 +94,18 @@ private:
   void createIndexBuffer();
   void createCommandBuffers();
   void createSyncObjects();
-
+  void createDescriptorPool();
+  void createDescriptorSets();
+  void createCameraUniformBuffer();
+  void updateCameraUniformBuffer();
+  void recordCommandBuffer(VkCommandBuffer, uint32_t);
   std::unique_ptr<Window> window;
 
   Camera camera;
+
+  VkDescriptorPool descriptorPool;
+  VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+  std::vector<VkDescriptorSet> descriptorSets;
 
   VkInstance instance;
   VkSurfaceKHR surface;
@@ -103,6 +119,10 @@ private:
   VkExtent2D swapChainExtent;
   std::vector<VkImageView> swapChainImageViews;
   std::vector<VkFramebuffer> swapChainFramebuffers;
+
+  std::vector<void *> cameraUniformBuffersMapped;
+  std::vector<VkBuffer> cameraUniformBuffers;
+  std::vector<VkDeviceMemory> cameraUniformBuffersMemory;
 
   VkRenderPass renderPass;
   VkPipelineLayout pipelineLayout;
@@ -121,7 +141,6 @@ private:
   std::vector<VkSemaphore> renderFinishedSemaphores;
   std::vector<VkFence> inFlightFences;
   uint32_t currentFrame = 0;
-  const int MAX_FRAMES_IN_FLIGHT = 2;
 };
 
 #endif // !VULKAN_APP_H

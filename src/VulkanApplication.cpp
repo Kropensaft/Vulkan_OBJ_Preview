@@ -1,4 +1,5 @@
 #include "FileParser.h"
+#include "InputController.h"
 #include "VulkanApplication.h"
 #include <cstddef>
 #include <cstdint>
@@ -8,8 +9,9 @@
 #include <sys/types.h>
 #include <vector>
 #include <vulkan/vulkan_core.h>
-const int WIDTH = 800;
-const int HEIGHT = 600;
+
+constexpr int WIDTH = 800;
+constexpr int HEIGHT = 600;
 
 std::vector<Vertex> VulkanApplication::vertices;
 std::vector<uint32_t> VulkanApplication::indices;
@@ -49,18 +51,27 @@ void VulkanApplication::initVulkan() {
   FileParser parser;
   parser.parse_OBJ("../assets/teapot.obj");
 
-  camera.CameraInit();
   createVertexBuffer();
   createIndexBuffer();
   createCommandBuffers();
   createSyncObjects();
+
+  camera.CameraInit();
+
+  createCameraUniformBuffer();
+  createDescriptorPool();
+  createDescriptorSets();
+  updateCameraUniformBuffer();
 }
 
 void VulkanApplication::mainLoop() {
+  InputController ic;
+
   while (!window->shouldClose()) {
     glfwPollEvents();
 
     camera.UpdateCamera(viewport);
+    updateCameraUniformBuffer();
 
     drawFrame();
   }
@@ -69,7 +80,14 @@ void VulkanApplication::mainLoop() {
 
 // INFO: destroy allocated devices in reverse order of declaration
 void VulkanApplication::cleanup() {
+  vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
+  // Clean up multiple uniform buffers
+  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    vkDestroyBuffer(device, cameraUniformBuffers[i], nullptr);
+    vkFreeMemory(device, cameraUniformBuffersMemory[i], nullptr);
+  }
   vkDestroyBuffer(device, vertexBuffer, nullptr);
   vkFreeMemory(device, vertexBufferMemory, nullptr);
   vkDestroyBuffer(device, indexBuffer, nullptr);
@@ -97,48 +115,21 @@ void VulkanApplication::cleanup() {
 }
 
 void VulkanApplication::drawFrame() {
+  // 1. Wait for the frame to be available
   vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
+  // 2. Acquire an image from the swap chain
   uint32_t imageIndex;
   vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
+  // 3. Reset the fence for the current frame
   vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
-  vkResetCommandBuffer(commandBuffers[imageIndex], 0);
+  // 4. Reset and record the command buffer for the current frame
+  vkResetCommandBuffer(commandBuffers[currentFrame], 0);
+  recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
-  VkCommandBufferBeginInfo beginInfo{};
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  if (vkBeginCommandBuffer(commandBuffers[imageIndex], &beginInfo) != VK_SUCCESS) {
-    throw std::runtime_error("failed to begin recording command buffer!");
-  }
-
-  VkRenderPassBeginInfo renderPassInfo{};
-  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  renderPassInfo.renderPass = renderPass;
-  renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
-  renderPassInfo.renderArea.offset = {0, 0};
-  renderPassInfo.renderArea.extent = swapChainExtent;
-  VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-  renderPassInfo.clearValueCount = 1;
-  renderPassInfo.pClearValues = &clearColor;
-
-  vkCmdBeginRenderPass(commandBuffers[imageIndex], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-  vkCmdBindPipeline(commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-  VkBuffer vertexBuffers[] = {vertexBuffer};
-  VkDeviceSize offsets[] = {0};
-  vkCmdBindVertexBuffers(commandBuffers[imageIndex], 0, 1, vertexBuffers, offsets);
-
-  vkCmdBindIndexBuffer(commandBuffers[imageIndex], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-  vkCmdDrawIndexed(commandBuffers[imageIndex], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
-
-  vkCmdEndRenderPass(commandBuffers[imageIndex]);
-
-  if (vkEndCommandBuffer(commandBuffers[imageIndex]) != VK_SUCCESS) {
-    throw std::runtime_error("failed to record command buffer!");
-  }
-
+  // 5. Submit the command buffer
   VkSubmitInfo submitInfo{};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
@@ -147,7 +138,7 @@ void VulkanApplication::drawFrame() {
   submitInfo.pWaitSemaphores = waitSemaphores;
   submitInfo.pWaitDstStageMask = waitStages;
   submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
+  submitInfo.pCommandBuffers = &commandBuffers[currentFrame]; // Submit the correct command buffer
   VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
   submitInfo.signalSemaphoreCount = 1;
   submitInfo.pSignalSemaphores = signalSemaphores;
@@ -156,6 +147,7 @@ void VulkanApplication::drawFrame() {
     throw std::runtime_error("failed to submit draw command buffer!");
   }
 
+  // 6. Present the image to the screen
   VkPresentInfoKHR presentInfo{};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
   presentInfo.waitSemaphoreCount = 1;
@@ -166,6 +158,8 @@ void VulkanApplication::drawFrame() {
   presentInfo.pImageIndices = &imageIndex;
 
   vkQueuePresentKHR(graphicsQueue, &presentInfo);
+
+  // 7. Advance to the next frame
   currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
@@ -409,7 +403,7 @@ void VulkanApplication::createGraphicsPipeline() {
   rasterizer.rasterizerDiscardEnable = VK_FALSE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
-  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+  rasterizer.cullMode = VK_CULL_MODE_NONE;
   rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
   rasterizer.depthBiasEnable = VK_FALSE;
 
@@ -428,8 +422,25 @@ void VulkanApplication::createGraphicsPipeline() {
   colorBlending.attachmentCount = 1;
   colorBlending.pAttachments = &colorBlendAttachment;
 
+  VkDescriptorSetLayoutBinding cameraLayoutBinding{};
+  cameraLayoutBinding.binding = 0;
+  cameraLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  cameraLayoutBinding.descriptorCount = 1;
+  cameraLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+  VkDescriptorSetLayoutCreateInfo layoutInfo{};
+  layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  layoutInfo.bindingCount = 1;
+  layoutInfo.pBindings = &cameraLayoutBinding;
+
+  if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to create descriptor set layout!");
+  }
+
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  pipelineLayoutInfo.setLayoutCount = 1;
+  pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
   if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
     throw std::runtime_error("failed to create pipeline layout!");
@@ -488,7 +499,7 @@ void VulkanApplication::createCommandPool() {
 }
 
 void VulkanApplication::createCommandBuffers() {
-  commandBuffers.resize(swapChainFramebuffers.size());
+  commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
   VkCommandBufferAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.commandPool = commandPool;
@@ -590,6 +601,141 @@ void VulkanApplication::createIndexBuffer() {
   vkUnmapMemory(device, indexBufferMemory);
 }
 
+void VulkanApplication::createCameraUniformBuffer() {
+  VkDeviceSize bufferSize = sizeof(glm::mat4);
+
+  cameraUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+  cameraUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+  cameraUniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = bufferSize;
+    bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device, &bufferInfo, nullptr, &cameraUniformBuffers[i]) != VK_SUCCESS) {
+      throw std::runtime_error("Failed to create camera uniform buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device, cameraUniformBuffers[i], &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits,
+                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &cameraUniformBuffersMemory[i]) != VK_SUCCESS) {
+      throw std::runtime_error("Failed to allocate camera uniform buffer memory!");
+    }
+
+    vkBindBufferMemory(device, cameraUniformBuffers[i], cameraUniformBuffersMemory[i], 0);
+
+    // Map the memory persistently
+    vkMapMemory(device, cameraUniformBuffersMemory[i], 0, bufferSize, 0, &cameraUniformBuffersMapped[i]);
+  }
+}
+void VulkanApplication::updateCameraUniformBuffer() {
+  glm::mat4 viewMatrix = camera.GetViewMatrix();
+  memcpy(cameraUniformBuffersMapped[currentFrame], &viewMatrix, sizeof(glm::mat4));
+
+  // Debug output
+  static int debugFrame = 0;
+  if (debugFrame++ % 60 == 0) {
+    glm::vec3 eye = camera.GetEye();
+    std::cout << "UNIFORM BUFFER UPDATE - Frame: " << currentFrame
+              << ", Camera Eye: (" << eye.x << ", " << eye.y << ", " << eye.z << ")" << std::endl;
+  }
+}
+
+void VulkanApplication::createDescriptorPool() {
+  VkDescriptorPoolSize poolSize{};
+  poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  poolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT; // Allocate for multiple frames
+
+  VkDescriptorPoolCreateInfo poolInfo{};
+  poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  poolInfo.poolSizeCount = 1;
+  poolInfo.pPoolSizes = &poolSize;
+  poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT; // Allow multiple descriptor sets
+
+  if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create descriptor pool!");
+  }
+}
+
+void VulkanApplication::createDescriptorSets() {
+  std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+  VkDescriptorSetAllocateInfo allocInfo{};
+  allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  allocInfo.descriptorPool = descriptorPool;
+  allocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+  allocInfo.pSetLayouts = layouts.data();
+
+  descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+  if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+    throw std::runtime_error("failed to allocate descriptor sets!");
+  }
+
+  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = cameraUniformBuffers[i];
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(glm::mat4);
+
+    VkWriteDescriptorSet descriptorWrite{};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = descriptorSets[i];
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pBufferInfo = &bufferInfo;
+
+    vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+  }
+}
+void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+  VkCommandBufferBeginInfo beginInfo{};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+  if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+    throw std::runtime_error("failed to begin recording command buffer!");
+  }
+
+  VkRenderPassBeginInfo renderPassInfo{};
+  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+  renderPassInfo.renderPass = renderPass;
+  renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+  renderPassInfo.renderArea.offset = {0, 0};
+  renderPassInfo.renderArea.extent = swapChainExtent;
+
+  VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+  renderPassInfo.clearValueCount = 1;
+  renderPassInfo.pClearValues = &clearColor;
+
+  vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+  VkBuffer vertexBuffers[] = {vertexBuffer};
+  VkDeviceSize offsets[] = {0};
+  vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+  vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+
+  vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+  vkCmdEndRenderPass(commandBuffer);
+
+  if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+    throw std::runtime_error("failed to record command buffer!");
+  }
+}
 const VkViewport &VulkanApplication::getViewPortRef() {
   return viewport;
 }

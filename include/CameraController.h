@@ -30,6 +30,11 @@ private:
   float xPos;
   float yPos;
   float yDeltaAngle;
+
+  float lastMouseX = 0.f;
+  float lastMouseY = 0.f;
+  bool firstMouse = false;
+
   glm::mat4x4 m_viewMatrix;
   glm::vec3 m_eye;      // INFO: Camera position in 3D
   glm::vec3 m_lookAt;   // Point that the camera is looking at
