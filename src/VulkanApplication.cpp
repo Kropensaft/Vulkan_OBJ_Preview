@@ -70,7 +70,7 @@ void VulkanApplication::mainLoop() {
   while (!window->shouldClose()) {
     glfwPollEvents();
 
-    camera.UpdateCamera(viewport);
+    // camera.UpdateCamera(viewport);
     updateCameraUniformBuffer();
 
     drawFrame();
@@ -115,21 +115,16 @@ void VulkanApplication::cleanup() {
 }
 
 void VulkanApplication::drawFrame() {
-  // 1. Wait for the frame to be available
   vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
-  // 2. Acquire an image from the swap chain
   uint32_t imageIndex;
   vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-  // 3. Reset the fence for the current frame
   vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
-  // 4. Reset and record the command buffer for the current frame
   vkResetCommandBuffer(commandBuffers[currentFrame], 0);
   recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
-  // 5. Submit the command buffer
   VkSubmitInfo submitInfo{};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
@@ -138,7 +133,7 @@ void VulkanApplication::drawFrame() {
   submitInfo.pWaitSemaphores = waitSemaphores;
   submitInfo.pWaitDstStageMask = waitStages;
   submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &commandBuffers[currentFrame]; // Submit the correct command buffer
+  submitInfo.pCommandBuffers = &commandBuffers[currentFrame]; // Submit the correct, newly recorded buffer
   VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
   submitInfo.signalSemaphoreCount = 1;
   submitInfo.pSignalSemaphores = signalSemaphores;
@@ -147,7 +142,6 @@ void VulkanApplication::drawFrame() {
     throw std::runtime_error("failed to submit draw command buffer!");
   }
 
-  // 6. Present the image to the screen
   VkPresentInfoKHR presentInfo{};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
   presentInfo.waitSemaphoreCount = 1;
@@ -158,8 +152,6 @@ void VulkanApplication::drawFrame() {
   presentInfo.pImageIndices = &imageIndex;
 
   vkQueuePresentKHR(graphicsQueue, &presentInfo);
-
-  // 7. Advance to the next frame
   currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
@@ -346,8 +338,8 @@ VkShaderModule VulkanApplication::createShaderModule(const std::vector<char> &co
 }
 
 void VulkanApplication::createGraphicsPipeline() {
-  auto vertShaderCode = readFile("../shaders/vertex.spv");
-  auto fragShaderCode = readFile("../shaders/fragment.spv");
+  auto vertShaderCode = readFile("shaders/vertex.spv");
+  auto fragShaderCode = readFile("shaders/fragment.spv");
   VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
   VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
 
@@ -404,7 +396,7 @@ void VulkanApplication::createGraphicsPipeline() {
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
   rasterizer.cullMode = VK_CULL_MODE_NONE;
-  rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+  rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.depthBiasEnable = VK_FALSE;
 
   VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -602,7 +594,7 @@ void VulkanApplication::createIndexBuffer() {
 }
 
 void VulkanApplication::createCameraUniformBuffer() {
-  VkDeviceSize bufferSize = sizeof(glm::mat4);
+  VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
   cameraUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
   cameraUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
@@ -633,21 +625,44 @@ void VulkanApplication::createCameraUniformBuffer() {
     }
 
     vkBindBufferMemory(device, cameraUniformBuffers[i], cameraUniformBuffersMemory[i], 0);
-
-    // Map the memory persistently
     vkMapMemory(device, cameraUniformBuffersMemory[i], 0, bufferSize, 0, &cameraUniformBuffersMapped[i]);
   }
 }
 void VulkanApplication::updateCameraUniformBuffer() {
-  glm::mat4 viewMatrix = camera.GetViewMatrix();
-  memcpy(cameraUniformBuffersMapped[currentFrame], &viewMatrix, sizeof(glm::mat4));
+  UniformBufferObject ubo{};
 
-  // Debug output
+  // --- START OF HARD-CODED TEST DATA ---
+
+  // 1. Manually create a simple, known-good View Matrix.
+  //    We are placing the camera at (2, 2, 2) and looking at the origin (0, 0, 0).
+  //    This completely bypasses the camera.GetViewMatrix() call.
+  ubo.view = glm::lookAt(
+      glm::vec3(2.0f, 2.0f, 2.0f), // Eye position
+      glm::vec3(0.0f, 0.0f, 0.0f), // Center point to look at
+      glm::vec3(0.0f, 1.0f, 0.0f)  // Up vector
+  );
+
+  // 2. Manually create a known-good Projection Matrix.
+  //    Using a very wide near/far plane to avoid any clipping issues.
+  ubo.proj = glm::perspective(
+      glm::radians(45.0f),
+      swapChainExtent.width / (float)swapChainExtent.height,
+      0.1f,
+      100.0f);
+
+  // 3. Apply the mandatory Vulkan Y-Flip.
+  ubo.proj[1][1] *= -1;
+
+  // --- END OF HARD-CODED TEST DATA ---
+
+  // 4. Copy the entire struct to the GPU buffer.
+  memcpy(cameraUniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
+
+  // Add a simple debug print to ensure this loop is running.
+  // This will print "TESTING..." to your console every ~60 frames.
   static int debugFrame = 0;
   if (debugFrame++ % 60 == 0) {
-    glm::vec3 eye = camera.GetEye();
-    std::cout << "UNIFORM BUFFER UPDATE - Frame: " << currentFrame
-              << ", Camera Eye: (" << eye.x << ", " << eye.y << ", " << eye.z << ")" << std::endl;
+    std::cout << "TESTING..." << std::endl;
   }
 }
 
@@ -684,7 +699,7 @@ void VulkanApplication::createDescriptorSets() {
     VkDescriptorBufferInfo bufferInfo{};
     bufferInfo.buffer = cameraUniformBuffers[i];
     bufferInfo.offset = 0;
-    bufferInfo.range = sizeof(glm::mat4);
+    bufferInfo.range = sizeof(UniformBufferObject);
 
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

@@ -41,10 +41,10 @@ struct Vertex {
   }
 };
 
-struct CameraBuffer {
+struct UniformBufferObject {
+  glm::mat4 proj;
   glm::mat4 view;
 };
-
 /*
 INFO:
    v_idx Index into the vertex position list ('v')
