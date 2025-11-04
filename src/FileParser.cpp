@@ -53,9 +53,6 @@ static void parse_vertex(std::string &line) {
     throw std::runtime_error("Error parsing vertex data");
     return;
   }
-  vert.pos.x *= SCALE;
-  vert.pos.y *= SCALE;
-  vert.pos.z *= SCALE;
   vert.color = {1.f, 1.f, 1.f};
   temp_positions.push_back(vert.pos);
 }

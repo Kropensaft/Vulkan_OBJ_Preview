@@ -1,6 +1,6 @@
 #include "CameraController.h"
-#include "InputController.h"
 #include "Storage.h"
+#include "VulkanApplication.h"
 #include <iostream>
 
 Camera::Camera(glm::vec3 &&eye, glm::vec3 &&lookat, glm::vec3 &&upVector)
@@ -30,6 +30,31 @@ void Camera::UpdateViewMatrix() {
   m_viewMatrix = glm::lookAt(m_eye, m_lookAt, m_upVector);
 }
 
+glm::vec3 Camera::zoomIn(float deltaTime) {
+  return m_eye += GetViewDir() * ZOOM_SPEED * deltaTime;
+}
+
+glm::vec3 Camera::zoomOut(float deltaTime) {
+  return m_eye -= GetViewDir() * ZOOM_SPEED * deltaTime;
+}
+void Camera::handleScroll(double yoffset) {
+  float deltaTime = VulkanApplication::getDeltaTime();
+
+  if (yoffset > 0) {
+    zoomIn(deltaTime);
+  } else if (yoffset < 0) {
+    zoomOut(deltaTime);
+  }
+
+  UpdateViewMatrix();
+}
+void Camera::scrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
+  Camera *camera = static_cast<Camera *>(glfwGetWindowUserPointer(window));
+  if (camera) {
+    camera->handleScroll(yoffset);
+  }
+}
+
 void Camera::UpdateCamera(GLFWwindow *window, float xoffset, float yoffset, float deltaTime) {
   float sensitivity = 0.5f;
   float xAngle = xoffset * sensitivity * deltaTime;
@@ -48,16 +73,6 @@ void Camera::UpdateCamera(GLFWwindow *window, float xoffset, float yoffset, floa
 
   glm::mat4 rotationMatrixY = glm::rotate(glm::mat4(1.0f), yAngle, GetRightVector());
   m_eye = (rotationMatrixY * (position - pivot)) + pivot;
-
-  float zoomSpeed = 2.5f;
-  glm::vec3 viewDir = GetViewDir();
-
-  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-    m_eye += viewDir * zoomSpeed * deltaTime;
-  }
-  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-    m_eye -= viewDir * zoomSpeed * deltaTime;
-  }
 
   UpdateViewMatrix();
 }

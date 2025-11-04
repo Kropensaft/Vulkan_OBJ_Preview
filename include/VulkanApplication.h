@@ -69,16 +69,17 @@ public:
   void run();
   static std::vector<Vertex> vertices;
   static std::vector<uint32_t> indices;
+  static float deltaTime;
 
   // INFO: Getters and setters
   const VkViewport &getViewPortRef();
+  static const float &getDeltaTime();
 
 private:
   void initVulkan();
   void mainLoop();
   void cleanup();
   void drawFrame();
-
   uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
   VkShaderModule createShaderModule(const std::vector<char> &code);
 

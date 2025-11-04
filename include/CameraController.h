@@ -8,6 +8,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan_core.h>
 
+constexpr float ZOOM_SPEED = 2.5f;
+
 class Camera {
 public:
   Camera() = default;
@@ -22,11 +24,15 @@ public:
   glm::vec3 GetViewDir() const;
   glm::vec3 GetRightVector() const;
 
-  void SetCameraView(glm::vec3 eye, glm::vec3 lookat, glm::vec3 up);
+  void SetCameraView(glm::vec3, glm::vec3, glm::vec3);
   void UpdateViewMatrix();
 
-  void UpdateCamera(GLFWwindow *window, float xoffset, float yoffset, float deltaTime);
+  void UpdateCamera(GLFWwindow *, float, float, float);
   void CameraInit();
+  static void scrollCallback(GLFWwindow *, double, double);
+  void handleScroll(double);
+  glm::vec3 zoomOut(float deltaTime);
+  glm::vec3 zoomIn(float deltaTime);
 
 private:
   float xPos;

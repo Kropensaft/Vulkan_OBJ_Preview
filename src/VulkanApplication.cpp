@@ -58,17 +58,23 @@ void VulkanApplication::initVulkan() {
 
   camera.CameraInit();
 
+  glfwSetWindowUserPointer(window->getGLFWwindow(), &camera);
+  glfwSetScrollCallback(window->getGLFWwindow(), Camera::scrollCallback);
+
   createCameraUniformBuffer();
   createDescriptorPool();
   createDescriptorSets();
   updateCameraUniformBuffer();
 }
 
+float VulkanApplication::deltaTime = 0.0f;
+const float &VulkanApplication::getDeltaTime() {
+  return deltaTime;
+}
+
 void VulkanApplication::mainLoop() {
-  // Vytvoříme instanci InputControlleru a propojíme ho s oknem a kamerou
   InputController inputController(*window, camera);
 
-  float deltaTime = 0.0f;
   float lastFrame = 0.0f;
 
   while (!window->shouldClose()) {
@@ -78,7 +84,6 @@ void VulkanApplication::mainLoop() {
 
     glfwPollEvents();
 
-    // V každém snímku zavoláme jedinou funkci, která se o vše postará
     inputController.processInput(deltaTime);
 
     updateCameraUniformBuffer();
@@ -92,7 +97,6 @@ void VulkanApplication::cleanup() {
   vkDestroyDescriptorPool(device, descriptorPool, nullptr);
   vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
-  // Clean up multiple uniform buffers
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vkDestroyBuffer(device, cameraUniformBuffers[i], nullptr);
     vkFreeMemory(device, cameraUniformBuffersMemory[i], nullptr);
