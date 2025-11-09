@@ -9,13 +9,17 @@ extern "C" {
 // The C++ code will provide a function of this type.
 typedef void (*OpenFileCallback)(const char *filepath);
 
+typedef void (*RenderWireframeCallback)(void);
+
 /**
  * @brief Creates the native macOS menu bar.
  *
  * @param native_window_handle A pointer to the native NSWindow.
  * @param callback The function to be called when the "Open" menu item is clicked.
  */
-void create_macos_menu_bar(void *native_window_handle, OpenFileCallback callback);
+void create_macos_menu_bar(void *native_window_handle,
+                           OpenFileCallback file_callback,
+                           RenderWireframeCallback wireframeCallback);
 
 #ifdef __cplusplus
 }

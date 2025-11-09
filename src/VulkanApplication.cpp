@@ -10,6 +10,9 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
+bool VulkanApplication::renderWireframe = true;
+PFN_vkCmdSetPolygonModeEXT VulkanApplication::vkCmdSetPolygonModeEXT = nullptr;
+
 constexpr int WIDTH = 800;
 constexpr int HEIGHT = 600;
 
@@ -224,24 +227,37 @@ void VulkanApplication::createLogicalDevice() {
   queueCreateInfo.queueCount = 1;
   queueCreateInfo.pQueuePriorities = &queuePriority;
 
-  VkPhysicalDeviceFeatures deviceFeatures{};
-  // NOTE: Needs to be enabled for support of rasterizer.fillMode Line
-  deviceFeatures.fillModeNonSolid = VK_TRUE;
-  //
+  VkPhysicalDeviceExtendedDynamicState3FeaturesEXT dynamicState3Features{};
+  dynamicState3Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
+  dynamicState3Features.extendedDynamicState3PolygonMode = VK_TRUE;
+
+  VkPhysicalDeviceFeatures2 deviceFeatures2{};
+  deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  deviceFeatures2.pNext = &dynamicState3Features; // Link the new struct
+  deviceFeatures2.features.fillModeNonSolid = VK_TRUE;
+
   VkDeviceCreateInfo createInfo{};
   createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   createInfo.queueCreateInfoCount = 1;
   createInfo.pQueueCreateInfos = &queueCreateInfo;
-  createInfo.pEnabledFeatures = &deviceFeatures;
+  createInfo.pEnabledFeatures = nullptr;
+  createInfo.pNext = &deviceFeatures2;
 
   const std::vector<const char *> deviceExtensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      "VK_KHR_portability_subset"};
+      "VK_KHR_portability_subset",
+      VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME};
+
   createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
   createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
   if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
     throw std::runtime_error("failed to create logical device!");
+  }
+  vkCmdSetPolygonModeEXT = (PFN_vkCmdSetPolygonModeEXT)vkGetDeviceProcAddr(device, "vkCmdSetPolygonModeEXT");
+
+  if (!vkCmdSetPolygonModeEXT) {
+    throw std::runtime_error("Failed to load vkCmdSetPolygonModeEXT function pointer!");
   }
 
   vkGetDeviceQueue(device, 0, 0, &graphicsQueue);
@@ -395,7 +411,6 @@ void VulkanApplication::createGraphicsPipeline() {
   viewport.minDepth = 0.0f;
   viewport.maxDepth = 1.0f;
 
-  VkRect2D scissor{};
   scissor.offset = {0, 0};
   scissor.extent = swapChainExtent;
 
@@ -406,13 +421,23 @@ void VulkanApplication::createGraphicsPipeline() {
   viewportState.scissorCount = 1;
   viewportState.pScissors = &scissor;
 
+  std::vector<VkDynamicState> dynamicStates = {
+      VK_DYNAMIC_STATE_VIEWPORT,
+      VK_DYNAMIC_STATE_SCISSOR,
+      VK_DYNAMIC_STATE_POLYGON_MODE_EXT};
+
+  VkPipelineDynamicStateCreateInfo dynamicStateInfo{};
+  dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+  dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+  dynamicStateInfo.pDynamicStates = dynamicStates.data();
+
   VkPipelineRasterizationStateCreateInfo rasterizer{};
   rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
   rasterizer.depthClampEnable = VK_FALSE;
   rasterizer.rasterizerDiscardEnable = VK_FALSE;
-  // rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-  rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
   rasterizer.lineWidth = 1.0f;
+
+  // HACK: VK_POLYGON_TYPE will be ingored during pipeline construction as its marked as dynamic
   rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.depthBiasEnable = VK_TRUE;
@@ -466,6 +491,7 @@ void VulkanApplication::createGraphicsPipeline() {
   pipelineInfo.pRasterizationState = &rasterizer;
   pipelineInfo.pMultisampleState = &multisampling;
   pipelineInfo.pColorBlendState = &colorBlending;
+  pipelineInfo.pDynamicState = &dynamicStateInfo;
   pipelineInfo.layout = pipelineLayout;
   pipelineInfo.renderPass = renderPass;
   pipelineInfo.subpass = 0;
@@ -723,17 +749,23 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
 
   vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-  // 1. Bind the pipeline first. This tells the GPU which shader program to use.
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-  // 2. Bind the descriptor sets. This provides the uniform data (like your camera matrices) to the shader.
+  vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+  vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+  if (!renderWireframe) {
+    VulkanApplication::vkCmdSetPolygonModeEXT(commandBuffer, VK_POLYGON_MODE_LINE);
+  } else {
+    VulkanApplication::vkCmdSetPolygonModeEXT(commandBuffer, VK_POLYGON_MODE_FILL);
+  }
   vkCmdBindDescriptorSets(
       commandBuffer,
       VK_PIPELINE_BIND_POINT_GRAPHICS,
       pipelineLayout,
-      0,                             // The 'set' number in the shader (layout(set=0, ...))
-      1,                             // We are binding one set
-      &descriptorSets[currentFrame], // The specific descriptor set for this frame
+      0,
+      1,
+      &descriptorSets[currentFrame],
       0, nullptr);
 
   // 3. Bind the geometry buffers.

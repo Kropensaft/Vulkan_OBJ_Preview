@@ -1,10 +1,10 @@
+#include "VulkanApplication.h"
 #include "Window.h"
 #include <stdexcept>
 
 #if defined(__APPLE__)
 
 #include "platforms/darwin/menu_darwin.h"
-// GLFW exposes the native window handle functions automatically
 #define GLFW_EXPOSE_NATIVE_COCOA
 #include <GLFW/glfw3native.h>
 #include <iostream>
@@ -19,6 +19,10 @@ void loadModelFromFile(const char *filepath) {
   } catch (const std::exception &e) {
     std::cerr << "Failed to load model: " << e.what() << std::endl;
   }
+}
+
+void renderWireframe(void) {
+  VulkanApplication::renderWireframe = !VulkanApplication::renderWireframe;
 }
 
 Window *Window::instance = nullptr;
@@ -44,7 +48,7 @@ void Window::initWindow() {
 // INFO: Create menu bar using the native API's
 #if defined(__APPLE__)
   void *native_window_handle = glfwGetCocoaWindow(window);
-  create_macos_menu_bar(native_window_handle, &loadModelFromFile);
+  create_macos_menu_bar(native_window_handle, &loadModelFromFile, &renderWireframe);
 #endif
 }
 

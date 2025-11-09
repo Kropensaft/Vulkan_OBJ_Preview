@@ -4,6 +4,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "CameraController.h"
 #include "Window.h"
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <array>
 #include <cstdint>
@@ -23,6 +24,7 @@ class VulkanApplication {
 public:
   void run();
 
+  static bool renderWireframe;
   static std::vector<Vertex> vertices;
   static std::vector<uint32_t> indices;
   static float deltaTime;
@@ -59,6 +61,7 @@ private:
   void recordCommandBuffer(VkCommandBuffer, uint32_t);
   std::unique_ptr<Window> window;
 
+  static PFN_vkCmdSetPolygonModeEXT vkCmdSetPolygonModeEXT;
   Camera camera;
 
   VkDescriptorPool descriptorPool;
@@ -70,7 +73,10 @@ private:
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
   VkDevice device;
   VkQueue graphicsQueue;
+
   VkViewport viewport;
+  VkRect2D scissor;
+
   VkSwapchainKHR swapChain;
   std::vector<VkImage> swapChainImages;
   VkFormat swapChainImageFormat;
