@@ -1,10 +1,36 @@
 #include "FileParser.h"
+#include "VulkanApplication.h"
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
-static std::vector<glm::vec3> temp_positions;
+// Add Vertex method implementations
+VkVertexInputBindingDescription Vertex::getBindingDescription() {
+  VkVertexInputBindingDescription bindingDescription{};
+  bindingDescription.binding = 0;
+  bindingDescription.stride = sizeof(Vertex);
+  bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+  return bindingDescription;
+}
+
+std::array<VkVertexInputAttributeDescription, 2> Vertex::getAttributeDescriptions() {
+  std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+  attributeDescriptions[0].binding = 0;
+  attributeDescriptions[0].location = 0;
+  attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+  attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+  attributeDescriptions[1].binding = 0;
+  attributeDescriptions[1].location = 1;
+  attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+  attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+  return attributeDescriptions;
+}
+
+// Rest of your existing FileParser.cpp code...
+std::vector<Triangle> FileParser::allTriangles;
 
 const std::unordered_map<std::string_view, ObjLineType> FileParser::prefixMap = {
     {"v", ObjLineType::VERTEX},
@@ -16,24 +42,23 @@ const std::unordered_map<std::string_view, ObjLineType> FileParser::prefixMap = 
     {"mtllib", ObjLineType::MATERIAL_LIBRARY},
     {"usemtl", ObjLineType::USE_MATERIAL}};
 
+static std::vector<glm::vec3> temp_positions;
+
 static VertexIndex parseVertexChunk(const std::string &chunk) {
   VertexIndex result;
   std::istringstream chunkStream(chunk);
   std::string part;
 
-  // INFO: Get the vertex idx
   if (std::getline(chunkStream, part, '/')) {
     if (!part.empty())
       result.v_idx = std::stoi(part);
   }
 
-  // INFO: Get the optional color idx
   if (std::getline(chunkStream, part, '/')) {
     if (!part.empty())
       result.vt_idx = std::stoi(part);
   }
 
-  // INFO: Get the optional normal idx
   if (std::getline(chunkStream, part)) {
     if (!part.empty())
       result.vn_idx = std::stoi(part);
@@ -57,7 +82,7 @@ static void parse_vertex(std::string &line) {
   temp_positions.push_back(vert.pos);
 }
 
-static void parse_face(std::string &line, std::vector<Triangle> &allTriangles) {
+static void parse_face(std::string &line) {
   std::istringstream lineStream(line);
   std::string prefix;
   lineStream >> prefix;
@@ -78,7 +103,7 @@ static void parse_face(std::string &line, std::vector<Triangle> &allTriangles) {
     tri.vertices[0] = v0;
     tri.vertices[1] = parsedIndices[i];
     tri.vertices[2] = parsedIndices[i + 1];
-    allTriangles.push_back(tri);
+    FileParser::allTriangles.push_back(tri);
   }
 }
 
@@ -106,11 +131,15 @@ static void parse_object(std::string &line) {
   // TODO: Implement object parsing
 }
 
-void FileParser::parse_OBJ(const std::string &filePath) {
+void FileParser::parse_OBJ(const char *filePath) {
   std::ifstream file_stream(filePath);
   if (!file_stream.is_open()) {
     throw std::runtime_error("Failed to open file stream, check file path");
   }
+
+  // Clear previous data
+  FileParser::allTriangles.clear();
+  temp_positions.clear();
 
   std::string line;
   while (std::getline(file_stream, line)) {
@@ -124,7 +153,7 @@ void FileParser::parse_OBJ(const std::string &filePath) {
       parse_vertex(line);
       break;
     case ObjLineType::FACE:
-      parse_face(line, allTriangles);
+      parse_face(line);
       break;
     case ObjLineType::TEXTURE_COORDINATE:
       parse_texture_coord(line);
@@ -150,10 +179,11 @@ void FileParser::parse_OBJ(const std::string &filePath) {
     }
   }
 
+  // Clear and populate VulkanApplication's static members
   VulkanApplication::vertices.clear();
   VulkanApplication::indices.clear();
 
-  for (const auto &tri : allTriangles) {
+  for (const auto &tri : FileParser::allTriangles) {
     for (int i = 0; i < 3; ++i) {
       const auto &vertex_indices = tri.vertices[i];
 
@@ -165,4 +195,8 @@ void FileParser::parse_OBJ(const std::string &filePath) {
       VulkanApplication::indices.push_back(VulkanApplication::vertices.size() - 1);
     }
   }
+
+  // Clean up temporary data
+  FileParser::allTriangles.clear();
+  temp_positions.clear();
 }

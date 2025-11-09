@@ -1,10 +1,26 @@
 #ifndef FILE_PARSER_H
 #define FILE_PARSER_H
 
-#include "VulkanApplication.h"
+#include <array>
+#include <glm/glm.hpp>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+#include <vulkan/vulkan_core.h>
+
+struct Vertex {
+  glm::vec3 pos;
+  glm::vec3 color;
+
+  static VkVertexInputBindingDescription getBindingDescription();
+  static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
+};
+
+struct VertexIndex {
+  int v_idx = 0;
+  int vt_idx = 0;
+  int vn_idx = 0;
+};
 
 struct Triangle {
   VertexIndex vertices[3];
@@ -26,7 +42,7 @@ constexpr double SCALE = 0.1;
 
 class FileParser {
 public:
-  void read_OBJ();
+  static void read_OBJ();
   static ObjLineType getLineType(std::string_view line) {
     if (line.empty() || line[0] == '#')
       return ObjLineType::UNKNOWN;
@@ -40,14 +56,12 @@ public:
     return (it != prefixMap.end()) ? it->second : ObjLineType::UNKNOWN;
   }
 
-  void parse_OBJ(const std::string &file_path);
+  static void parse_OBJ(const char *filepath);
 
-  FileParser() {};
-  ~FileParser() {}
+  static std::vector<Triangle> allTriangles;
 
 private:
-  std::vector<Triangle> allTriangles;
   static const std::unordered_map<std::string_view, ObjLineType> prefixMap;
 };
 
-#endif // !FILE_PARSER_H
+#endif

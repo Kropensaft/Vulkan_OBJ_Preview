@@ -41,7 +41,16 @@ target_link_libraries(${PROJECT_NAME}
         glfw
 )
 
-# Handle Apple-specific frameworks for the target
-if(APPLE)
-    target_link_libraries(${PROJECT_NAME} PRIVATE "-framework Cocoa" "-framework IOKit" "-framework Foundation")
+# NOTE: Apple specific build process
+if (APPLE)
+    # Add the Objective-C++ source file to your executable
+    target_sources(${PROJECT_NAME} PRIVATE src/platforms/darwin/menu_darwin.mm)
+
+    # Find and link the Cocoa framework, which provides all the NSMenu, NSWindow, etc. APIs
+    find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${COCOA_FRAMEWORK})
+
+    # You might also need to add this for Objective-C runtime features
+    find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${FOUNDATION_FRAMEWORK})
 endif()

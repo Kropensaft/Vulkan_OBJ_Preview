@@ -2,7 +2,7 @@
 
 InputController::InputController(Window &window, Camera &camera)
     : m_window(window), m_camera(camera) {
-  glfwSetInputMode(m_window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  glfwSetInputMode(m_window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 }
 
 void InputController::processInput(float deltaTime) {

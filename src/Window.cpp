@@ -1,6 +1,26 @@
 #include "Window.h"
 #include <stdexcept>
 
+#if defined(__APPLE__)
+
+#include "platforms/darwin/menu_darwin.h"
+// GLFW exposes the native window handle functions automatically
+#define GLFW_EXPOSE_NATIVE_COCOA
+#include <GLFW/glfw3native.h>
+#include <iostream>
+
+#endif
+
+void loadModelFromFile(const char *filepath) {
+  std::cout << "Menu callback received. Filepath: " << filepath << std::endl;
+  try {
+    FileParser::parse_OBJ(filepath);
+    std::cout << "Successfully loaded model: " << filepath << std::endl;
+  } catch (const std::exception &e) {
+    std::cerr << "Failed to load model: " << e.what() << std::endl;
+  }
+}
+
 Window *Window::instance = nullptr;
 
 Window::Window(int w, int h, std::string name) : width(w), height(h), windowName(name) {
@@ -20,6 +40,12 @@ void Window::initWindow() {
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
   window = glfwCreateWindow(width, height, windowName.c_str(), nullptr, nullptr);
+
+// INFO: Create menu bar using the native API's
+#if defined(__APPLE__)
+  void *native_window_handle = glfwGetCocoaWindow(window);
+  create_macos_menu_bar(native_window_handle, &loadModelFromFile);
+#endif
 }
 
 void Window::setupInputCallbacks() {

@@ -31,6 +31,7 @@ static std::vector<char> readFile(const std::string &filename) {
 
 void VulkanApplication::run() {
   window = std::make_unique<Window>(WIDTH, HEIGHT, "Vulkan OBJ Preview");
+
   initVulkan();
   mainLoop();
   cleanup();

@@ -14,64 +14,19 @@
 
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
-struct Vertex {
-  glm::vec3 pos;
-  glm::vec3 color;
-
-  static VkVertexInputBindingDescription getBindingDescription() {
-    VkVertexInputBindingDescription bindingDescription{};
-    bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(Vertex);
-    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    return bindingDescription;
-  }
-
-  static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
-    std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
-    attributeDescriptions[0].binding = 0;
-    attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT; // FIX: Was R32G32
-    attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
-    attributeDescriptions[1].binding = 0;
-    attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = offsetof(Vertex, color);
-
-    return attributeDescriptions;
-  }
-};
-
-// FIX: DON'T CHANGE THE ORDER UNLESS YOU WANT TO EXPERIENCE A WORLD OF PAIN
 struct UniformBufferObject {
   glm::mat4 view;
   glm::mat4 proj;
-};
-/*
-INFO:
-   v_idx Index into the vertex position list ('v')
-   vt_idx Index into the texture coordinate list ('vt')
-   vn_idx Index into the vertex normal list ('vn')
-
-  NOTE: Initializing to 0 signals absence
-*/
-struct VertexIndex {
-  int v_idx = 0;
-  int vt_idx = 0;
-  int vn_idx = 0;
-};
-struct Face {
-  std::vector<VertexIndex> vertexIndices;
 };
 
 class VulkanApplication {
 public:
   void run();
+
   static std::vector<Vertex> vertices;
   static std::vector<uint32_t> indices;
   static float deltaTime;
 
-  // INFO: Getters and setters
   const VkViewport &getViewPortRef();
   static const float &getDeltaTime();
 
@@ -146,4 +101,4 @@ private:
   uint32_t currentFrame = 0;
 };
 
-#endif // !VULKAN_APP_H
+#endif
