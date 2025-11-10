@@ -104,6 +104,10 @@ void VulkanApplication::cleanupGeometryBuffers() {
 }
 
 void VulkanApplication::recreateGeometryBuffers() {
+
+  // FIX: Wait before deallocating since it may be called mid frame
+  vkDeviceWaitIdle(device);
+
   cleanupGeometryBuffers();
 
   createVertexBuffer();
