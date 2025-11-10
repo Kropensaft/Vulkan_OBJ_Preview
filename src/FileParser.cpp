@@ -1,6 +1,7 @@
 #include "FileParser.h"
 #include "VulkanApplication.h"
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -90,17 +91,24 @@ static void parse_face(std::string &line) {
   std::vector<VertexIndex> parsedIndices;
   std::string chunk;
   while (lineStream >> chunk) {
-    parsedIndices.push_back(parseVertexChunk(chunk));
+    VertexIndex vi = parseVertexChunk(chunk);
+    // Validate the vertex index exists
+    if (vi.v_idx > 0 && vi.v_idx <= temp_positions.size()) {
+      parsedIndices.push_back(vi);
+    } else {
+      std::cerr << "Warning: Invalid vertex index " << vi.v_idx << " in face" << std::endl;
+    }
   }
 
   if (parsedIndices.size() < 3) {
-    return; // Invalid face
+    std::cerr << "Warning: Face with less than 3 vertices" << std::endl;
+    return;
   }
 
-  const VertexIndex &v0 = parsedIndices[0];
+  // Triangulate the face (handles both triangles and quads)
   for (size_t i = 1; i < parsedIndices.size() - 1; ++i) {
     Triangle tri;
-    tri.vertices[0] = v0;
+    tri.vertices[0] = parsedIndices[0];
     tri.vertices[1] = parsedIndices[i];
     tri.vertices[2] = parsedIndices[i + 1];
     FileParser::allTriangles.push_back(tri);
@@ -140,6 +148,8 @@ void FileParser::parse_OBJ(const char *filePath) {
   // Clear previous data
   FileParser::allTriangles.clear();
   temp_positions.clear();
+  VulkanApplication::vertices.clear();
+  VulkanApplication::indices.clear();
 
   std::string line;
   while (std::getline(file_stream, line)) {
@@ -174,29 +184,40 @@ void FileParser::parse_OBJ(const char *filePath) {
       parse_object(line);
       break;
     case ObjLineType::UNKNOWN:
-      // Skip comments or unsupported lines
+      std::cout << "Unknown line type encountered" << std::endl;
       break;
     }
   }
 
-  // Clear and populate VulkanApplication's static members
+  // Clear previous data
   VulkanApplication::vertices.clear();
   VulkanApplication::indices.clear();
 
+  // First, create all unique vertices from temp_positions
+  for (const auto &pos : temp_positions) {
+    Vertex vertex;
+    vertex.pos = pos;
+    vertex.color = {1.0f, 1.0f, 1.0f}; // White color
+    VulkanApplication::vertices.push_back(vertex);
+  }
+
+  // Then create indices by referencing the vertex positions
   for (const auto &tri : FileParser::allTriangles) {
     for (int i = 0; i < 3; ++i) {
-      const auto &vertex_indices = tri.vertices[i];
+      // OBJ uses 1-based indexing, convert to 0-based
+      uint32_t vertexIndex = tri.vertices[i].v_idx - 1;
 
-      Vertex final_vertex;
-      final_vertex.pos = temp_positions[vertex_indices.v_idx - 1];
-      final_vertex.color = {1.0f, 1.0f, 1.0f}; // Default color
-
-      VulkanApplication::vertices.push_back(final_vertex);
-      VulkanApplication::indices.push_back(VulkanApplication::vertices.size() - 1);
+      // Validate the index
+      if (vertexIndex < VulkanApplication::vertices.size()) {
+        VulkanApplication::indices.push_back(vertexIndex);
+      } else {
+        std::cerr << "Error: Invalid vertex index " << vertexIndex << std::endl;
+      }
     }
   }
 
-  // Clean up temporary data
-  FileParser::allTriangles.clear();
-  temp_positions.clear();
+  std::cout << "Final: " << VulkanApplication::vertices.size() << " vertices, "
+            << VulkanApplication::indices.size() << " indices" << std::endl;
+
+  auto app = VulkanApplication::getInstance();
 }

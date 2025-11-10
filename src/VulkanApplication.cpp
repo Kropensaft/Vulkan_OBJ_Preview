@@ -10,14 +10,16 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
+VulkanApplication *VulkanApplication::appInstance = nullptr;
 bool VulkanApplication::renderWireframe = true;
 PFN_vkCmdSetPolygonModeEXT VulkanApplication::vkCmdSetPolygonModeEXT = nullptr;
+float VulkanApplication::deltaTime = 0.0f;
+std::vector<Vertex> VulkanApplication::vertices;
+std::vector<uint32_t> VulkanApplication::indices;
 
 constexpr int WIDTH = 800;
 constexpr int HEIGHT = 600;
-
-std::vector<Vertex> VulkanApplication::vertices;
-std::vector<uint32_t> VulkanApplication::indices;
+const int MAX_FRAMES_IN_FLIGHT = 2;
 
 static std::vector<char> readFile(const std::string &filename) {
   std::ifstream file(filename, std::ios::ate | std::ios::binary);
@@ -32,7 +34,88 @@ static std::vector<char> readFile(const std::string &filename) {
   return buffer;
 }
 
+void VulkanApplication::toggleWireframe() {
+  if (appInstance) {
+    appInstance->instanceToggleWireframe();
+  }
+}
+
+void VulkanApplication::zoomIn() {
+  if (appInstance) {
+    appInstance->instanceZoomIn();
+  }
+}
+
+void VulkanApplication::zoomOut() {
+  if (appInstance) {
+    appInstance->instanceZoomOut();
+  }
+}
+
+void VulkanApplication::instanceLoadNewModel(const char *filePath) {
+  std::cout << "Loading new model: " << filePath << std::endl;
+  try {
+    FileParser parser;
+    parser.parse_OBJ(filePath);
+
+    recreateGeometryBuffers();
+
+    std::cout << "Successfully loaded model: " << filePath << std::endl;
+    std::cout << "Vertices: " << vertices.size() << ", Indices: " << indices.size() << std::endl;
+  } catch (const std::exception &e) {
+    std::cerr << "Failed to load model: " << e.what() << std::endl;
+  }
+}
+
+void VulkanApplication::instanceToggleWireframe() {
+  renderWireframe = !renderWireframe;
+  std::cout << "Wireframe mode: " << (renderWireframe ? "ON" : "OFF") << std::endl;
+}
+
+void VulkanApplication::instanceZoomIn() {
+  float dt = getDeltaTime();
+  camera.zoomIn(dt);
+  std::cout << "Zooming in" << std::endl;
+}
+
+void VulkanApplication::instanceZoomOut() {
+  float dt = getDeltaTime();
+  camera.zoomOut(dt);
+  std::cout << "Zooming out" << std::endl;
+}
+
+void VulkanApplication::cleanupGeometryBuffers() {
+  if (indexBuffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(device, indexBuffer, nullptr);
+    indexBuffer = VK_NULL_HANDLE;
+  }
+  if (indexBufferMemory != VK_NULL_HANDLE) {
+    vkFreeMemory(device, indexBufferMemory, nullptr);
+    indexBufferMemory = VK_NULL_HANDLE;
+  }
+  if (vertexBuffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(device, vertexBuffer, nullptr);
+    vertexBuffer = VK_NULL_HANDLE;
+  }
+  if (vertexBufferMemory != VK_NULL_HANDLE) {
+    vkFreeMemory(device, vertexBufferMemory, nullptr);
+    vertexBufferMemory = VK_NULL_HANDLE;
+  }
+}
+
+void VulkanApplication::recreateGeometryBuffers() {
+  cleanupGeometryBuffers();
+
+  createVertexBuffer();
+  createIndexBuffer();
+
+  std::cout << "Recreated geometry buffers with " << vertices.size()
+            << " vertices and " << indices.size() << " indices" << std::endl;
+}
+
 void VulkanApplication::run() {
+  appInstance = this;
+
   window = std::make_unique<Window>(WIDTH, HEIGHT, "Vulkan OBJ Preview");
 
   initVulkan();
@@ -71,7 +154,6 @@ void VulkanApplication::initVulkan() {
   updateCameraUniformBuffer();
 }
 
-float VulkanApplication::deltaTime = 0.0f;
 const float &VulkanApplication::getDeltaTime() {
   return deltaTime;
 }
@@ -96,8 +178,9 @@ void VulkanApplication::mainLoop() {
   vkDeviceWaitIdle(device);
 }
 
-// INFO: destroy allocated devices in reverse order of declaration
 void VulkanApplication::cleanup() {
+  cleanupGeometryBuffers();
+
   vkDestroyDescriptorPool(device, descriptorPool, nullptr);
   vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
@@ -105,10 +188,6 @@ void VulkanApplication::cleanup() {
     vkDestroyBuffer(device, cameraUniformBuffers[i], nullptr);
     vkFreeMemory(device, cameraUniformBuffersMemory[i], nullptr);
   }
-  vkDestroyBuffer(device, vertexBuffer, nullptr);
-  vkFreeMemory(device, vertexBufferMemory, nullptr);
-  vkDestroyBuffer(device, indexBuffer, nullptr);
-  vkFreeMemory(device, indexBufferMemory, nullptr);
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
@@ -129,6 +208,8 @@ void VulkanApplication::cleanup() {
   vkDestroyDevice(device, nullptr);
   vkDestroySurfaceKHR(instance, surface, nullptr);
   vkDestroyInstance(instance, nullptr);
+
+  appInstance = nullptr;
 }
 
 void VulkanApplication::drawFrame() {
@@ -150,7 +231,7 @@ void VulkanApplication::drawFrame() {
   submitInfo.pWaitSemaphores = waitSemaphores;
   submitInfo.pWaitDstStageMask = waitStages;
   submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &commandBuffers[currentFrame]; // Submit the correct, newly recorded buffer
+  submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
   VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
   submitInfo.signalSemaphoreCount = 1;
   submitInfo.pSignalSemaphores = signalSemaphores;
@@ -233,7 +314,7 @@ void VulkanApplication::createLogicalDevice() {
 
   VkPhysicalDeviceFeatures2 deviceFeatures2{};
   deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  deviceFeatures2.pNext = &dynamicState3Features; // Link the new struct
+  deviceFeatures2.pNext = &dynamicState3Features;
   deviceFeatures2.features.fillModeNonSolid = VK_TRUE;
 
   VkDeviceCreateInfo createInfo{};
@@ -436,9 +517,7 @@ void VulkanApplication::createGraphicsPipeline() {
   rasterizer.depthClampEnable = VK_FALSE;
   rasterizer.rasterizerDiscardEnable = VK_FALSE;
   rasterizer.lineWidth = 1.0f;
-
-  // HACK: VK_POLYGON_TYPE will be ingored during pipeline construction as its marked as dynamic
-  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+  rasterizer.cullMode = VK_CULL_MODE_NONE;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.depthBiasEnable = VK_TRUE;
 
@@ -578,6 +657,11 @@ uint32_t VulkanApplication::findMemoryType(uint32_t typeFilter, VkMemoryProperty
 }
 
 void VulkanApplication::createVertexBuffer() {
+  if (vertices.empty()) {
+    std::cout << "Warning: No vertices to upload to GPU" << std::endl;
+    return;
+  }
+
   VkBufferCreateInfo bufferInfo{};
   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferInfo.size = sizeof(vertices[0]) * vertices.size();
@@ -608,10 +692,15 @@ void VulkanApplication::createVertexBuffer() {
 }
 
 void VulkanApplication::createIndexBuffer() {
+  if (indices.empty()) {
+    std::cout << "Warning: No indices to upload to GPU" << std::endl;
+    return;
+  }
+
   VkBufferCreateInfo bufferInfo{};
   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferInfo.size = sizeof(indices[0]) * indices.size();
-  bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT; // Different usage
+  bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
   if (vkCreateBuffer(device, &bufferInfo, nullptr, &indexBuffer) != VK_SUCCESS) {
@@ -672,8 +761,10 @@ void VulkanApplication::createCameraUniformBuffer() {
     vkMapMemory(device, cameraUniformBuffersMemory[i], 0, bufferSize, 0, &cameraUniformBuffersMapped[i]);
   }
 }
+
 void VulkanApplication::updateCameraUniformBuffer() {
   UniformBufferObject ubo{};
+  ubo.model = glm::mat4(1.0f);
   ubo.view = camera.GetViewMatrix();
   ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
   ubo.proj[1][1] *= -1;
@@ -684,13 +775,13 @@ void VulkanApplication::updateCameraUniformBuffer() {
 void VulkanApplication::createDescriptorPool() {
   VkDescriptorPoolSize poolSize{};
   poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  poolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT; // Allocate for multiple frames
+  poolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT;
 
   VkDescriptorPoolCreateInfo poolInfo{};
   poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   poolInfo.poolSizeCount = 1;
   poolInfo.pPoolSizes = &poolSize;
-  poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT; // Allow multiple descriptor sets
+  poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
 
   if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
     throw std::runtime_error("failed to create descriptor pool!");
@@ -728,6 +819,7 @@ void VulkanApplication::createDescriptorSets() {
     vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
   }
 }
+
 void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
   VkCommandBufferBeginInfo beginInfo{};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -754,11 +846,12 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
   vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
   vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-  if (!renderWireframe) {
+  if (renderWireframe) {
     VulkanApplication::vkCmdSetPolygonModeEXT(commandBuffer, VK_POLYGON_MODE_LINE);
   } else {
     VulkanApplication::vkCmdSetPolygonModeEXT(commandBuffer, VK_POLYGON_MODE_FILL);
   }
+
   vkCmdBindDescriptorSets(
       commandBuffer,
       VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -768,14 +861,14 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
       &descriptorSets[currentFrame],
       0, nullptr);
 
-  // 3. Bind the geometry buffers.
   VkBuffer vertexBuffers[] = {vertexBuffer};
   VkDeviceSize offsets[] = {0};
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
   vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-  // 4. Issue the draw call. The GPU now has everything it needs.
-  vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+  if (!indices.empty()) {
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+  }
 
   vkCmdEndRenderPass(commandBuffer);
 
@@ -783,6 +876,7 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
     throw std::runtime_error("failed to record command buffer!");
   }
 }
+
 const VkViewport &VulkanApplication::getViewPortRef() {
   return viewport;
 }

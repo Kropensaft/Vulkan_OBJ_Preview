@@ -1,45 +1,57 @@
-#ifndef VULKAN_APP_H
-#define VULKAN_APP_H
+#ifndef VULKAN_APPLICATION_H
+#define VULKAN_APPLICATION_H
 
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "CameraController.h"
+#include "FileParser.h"
 #include "Window.h"
-#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-#include <array>
-#include <cstdint>
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
-#include <vulkan/vulkan_core.h>
-
-constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+#include <vulkan/vulkan.h>
 
 struct UniformBufferObject {
   glm::mat4 view;
   glm::mat4 proj;
+  glm::mat4 model;
 };
 
 class VulkanApplication {
+private:
+  static VulkanApplication *appInstance;
+
 public:
+  VulkanApplication(const VulkanApplication &) = delete;
+  VulkanApplication &operator=(const VulkanApplication &) = delete;
+
+  static VulkanApplication *getInstance() {
+    return appInstance;
+  }
+
+  static void toggleWireframe();
+  static void zoomIn();
+  static void zoomOut();
+
+  void recreateGeometryBuffers();
   void run();
+  void cleanup();
+  static const float &getDeltaTime();
 
   static bool renderWireframe;
   static std::vector<Vertex> vertices;
   static std::vector<uint32_t> indices;
-  static float deltaTime;
 
-  const VkViewport &getViewPortRef();
-  static const float &getDeltaTime();
+  VulkanApplication() = default;
 
 private:
+  void instanceLoadNewModel(const char *filePath);
+  void instanceToggleWireframe();
+  void instanceZoomIn();
+  void instanceZoomOut();
+  void cleanupGeometryBuffers();
+
   void initVulkan();
   void mainLoop();
-  void cleanup();
-  void drawFrame();
-  uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-  VkShaderModule createShaderModule(const std::vector<char> &code);
-
   void createInstance();
   void createSurface();
   void pickPhysicalDevice();
@@ -50,61 +62,56 @@ private:
   void createGraphicsPipeline();
   void createFramebuffers();
   void createCommandPool();
-  void createVertexBuffer();
-  void createIndexBuffer();
   void createCommandBuffers();
   void createSyncObjects();
+  void createVertexBuffer();
+  void createIndexBuffer();
+  void createCameraUniformBuffer();
   void createDescriptorPool();
   void createDescriptorSets();
-  void createCameraUniformBuffer();
   void updateCameraUniformBuffer();
-  void recordCommandBuffer(VkCommandBuffer, uint32_t);
+  void drawFrame();
+  void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+  uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+  VkShaderModule createShaderModule(const std::vector<char> &code);
+  const VkViewport &getViewPortRef();
+
   std::unique_ptr<Window> window;
-
-  static PFN_vkCmdSetPolygonModeEXT vkCmdSetPolygonModeEXT;
-  Camera camera;
-
-  VkDescriptorPool descriptorPool;
-  VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-  std::vector<VkDescriptorSet> descriptorSets;
-
   VkInstance instance;
   VkSurfaceKHR surface;
-  VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+  VkPhysicalDevice physicalDevice;
   VkDevice device;
   VkQueue graphicsQueue;
-
-  VkViewport viewport;
-  VkRect2D scissor;
-
   VkSwapchainKHR swapChain;
   std::vector<VkImage> swapChainImages;
   VkFormat swapChainImageFormat;
   VkExtent2D swapChainExtent;
   std::vector<VkImageView> swapChainImageViews;
-  std::vector<VkFramebuffer> swapChainFramebuffers;
-
-  std::vector<void *> cameraUniformBuffersMapped;
-  std::vector<VkBuffer> cameraUniformBuffers;
-  std::vector<VkDeviceMemory> cameraUniformBuffersMemory;
-
   VkRenderPass renderPass;
   VkPipelineLayout pipelineLayout;
   VkPipeline graphicsPipeline;
-
+  std::vector<VkFramebuffer> swapChainFramebuffers;
   VkCommandPool commandPool;
   std::vector<VkCommandBuffer> commandBuffers;
-
-  VkBuffer vertexBuffer;
-  VkDeviceMemory vertexBufferMemory;
-
-  VkBuffer indexBuffer;
-  VkDeviceMemory indexBufferMemory;
-
   std::vector<VkSemaphore> imageAvailableSemaphores;
   std::vector<VkSemaphore> renderFinishedSemaphores;
   std::vector<VkFence> inFlightFences;
-  uint32_t currentFrame = 0;
+  VkBuffer vertexBuffer;
+  VkDeviceMemory vertexBufferMemory;
+  VkBuffer indexBuffer;
+  VkDeviceMemory indexBufferMemory;
+  std::vector<VkBuffer> cameraUniformBuffers;
+  std::vector<VkDeviceMemory> cameraUniformBuffersMemory;
+  std::vector<void *> cameraUniformBuffersMapped;
+  VkDescriptorSetLayout descriptorSetLayout;
+  VkDescriptorPool descriptorPool;
+  std::vector<VkDescriptorSet> descriptorSets;
+  Camera camera;
+  size_t currentFrame = 0;
+  VkViewport viewport;
+  VkRect2D scissor;
+  static float deltaTime;
+  static PFN_vkCmdSetPolygonModeEXT vkCmdSetPolygonModeEXT;
 };
 
 #endif
