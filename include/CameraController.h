@@ -9,7 +9,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan_core.h>
 
-constexpr float ZOOM_SPEED = 2.5f;
+constexpr float ZOOM_SPEED = 10.f;
 
 class Camera {
 public:

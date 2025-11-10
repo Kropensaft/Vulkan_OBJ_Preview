@@ -21,10 +21,32 @@ void loadModelFromFile(const char *filepath) {
   }
 }
 
+GLFWwindow *Window::getGLFWWindow() {
+  return instance->window;
+}
+
 void renderWireframe(void) {
   VulkanApplication::renderWireframe = !VulkanApplication::renderWireframe;
 }
 
+void Window::zoomIn(void) {
+  if (instance && instance->window) {
+    Camera *camera = static_cast<Camera *>(glfwGetWindowUserPointer(instance->window));
+    if (camera) {
+      float dt = VulkanApplication::getDeltaTime();
+      camera->zoomIn(dt);
+    }
+  }
+}
+void Window::zoomOut(void) {
+  if (instance && instance->window) {
+    Camera *camera = static_cast<Camera *>(glfwGetWindowUserPointer(instance->window));
+    if (camera) {
+      float dt = VulkanApplication::getDeltaTime();
+      camera->zoomOut(dt);
+    }
+  }
+}
 Window *Window::instance = nullptr;
 
 Window::Window(int w, int h, std::string name) : width(w), height(h), windowName(name) {
@@ -48,7 +70,7 @@ void Window::initWindow() {
 // INFO: Create menu bar using the native API's
 #if defined(__APPLE__)
   void *native_window_handle = glfwGetCocoaWindow(window);
-  create_macos_menu_bar(native_window_handle, &loadModelFromFile, &renderWireframe);
+  create_macos_menu_bar(native_window_handle, &loadModelFromFile, &renderWireframe, &Window::zoomIn, &Window::zoomOut);
 #endif
 }
 

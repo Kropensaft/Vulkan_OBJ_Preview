@@ -62,8 +62,8 @@ void VulkanApplication::initVulkan() {
 
   camera.CameraInit();
 
-  glfwSetWindowUserPointer(window->getGLFWwindow(), &camera);
-  glfwSetScrollCallback(window->getGLFWwindow(), Camera::scrollCallback);
+  glfwSetWindowUserPointer(window->getGLFWWindow(), &camera);
+  glfwSetScrollCallback(window->getGLFWWindow(), Camera::scrollCallback);
 
   createCameraUniformBuffer();
   createDescriptorPool();

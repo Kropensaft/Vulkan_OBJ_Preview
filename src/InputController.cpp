@@ -2,11 +2,11 @@
 
 InputController::InputController(Window &window, Camera &camera)
     : m_window(window), m_camera(camera) {
-  glfwSetInputMode(m_window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+  glfwSetInputMode(m_window.getGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 }
 
 void InputController::processInput(float deltaTime) {
-  GLFWwindow *glfwWindow = m_window.getGLFWwindow();
+  GLFWwindow *glfwWindow = m_window.getGLFWWindow();
 
   if (glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
     glfwSetWindowShouldClose(glfwWindow, true);

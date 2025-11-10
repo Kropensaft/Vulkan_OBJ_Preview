@@ -11,6 +11,9 @@ typedef void (*OpenFileCallback)(const char *filepath);
 
 typedef void (*RenderWireframeCallback)(void);
 
+typedef void (*ZoomInCallback)(void);
+
+typedef void (*ZoomOutCallback)(void);
 /**
  * @brief Creates the native macOS menu bar.
  *
@@ -19,7 +22,9 @@ typedef void (*RenderWireframeCallback)(void);
  */
 void create_macos_menu_bar(void *native_window_handle,
                            OpenFileCallback file_callback,
-                           RenderWireframeCallback wireframeCallback);
+                           RenderWireframeCallback wireframeCallback,
+                           ZoomInCallback zoomInCallback,
+                           ZoomOutCallback zoomOutCallback);
 
 #ifdef __cplusplus
 }
