@@ -14,6 +14,7 @@ struct UniformBufferObject {
   glm::mat4 view;
   glm::mat4 proj;
   glm::mat4 model;
+  glm::mat4 normal;
 };
 
 class VulkanApplication {
@@ -71,6 +72,7 @@ private:
   void createDescriptorSets();
   void updateCameraUniformBuffer();
   void drawFrame();
+  void createNormalMatrixUniformBuffer();
   void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
   uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
   VkShaderModule createShaderModule(const std::vector<char> &code);
@@ -106,6 +108,11 @@ private:
   VkDescriptorSetLayout descriptorSetLayout;
   VkDescriptorPool descriptorPool;
   std::vector<VkDescriptorSet> descriptorSets;
+
+  std::vector<VkBuffer> normalMatrixUniformBuffers;
+  std::vector<VkDeviceMemory> normalMatrixUniformBuffersMemory;
+  std::vector<void *> normalMatrixUniformBuffersMapped;
+
   Camera camera;
   size_t currentFrame = 0;
   VkViewport viewport;

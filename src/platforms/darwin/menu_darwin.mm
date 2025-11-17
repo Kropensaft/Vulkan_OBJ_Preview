@@ -83,7 +83,6 @@ void create_macos_menu_bar(void *native_window_handle,
     NSApplication *app = [NSApplication sharedApplication];
     NSMenu *mainMenu = [[NSMenu alloc] init];
 
-    // --- Create a NEW, LOCAL MenuActionTarget instance ---
     MenuActionTarget *menuTarget = [[MenuActionTarget alloc] init];
     menuTarget.openFileCallback = open_callback;
     menuTarget.toggleWireframeCallback = wireframe_callback;
@@ -94,6 +93,13 @@ void create_macos_menu_bar(void *native_window_handle,
     [mainMenu addItem:appMenuItem];
     NSMenu *appMenu = [[NSMenu alloc] init];
     [appMenuItem setSubmenu:appMenu];
+
+    NSMenuItem *quitMenuItem =
+        [[NSMenuItem alloc] initWithTitle:@"Quit"
+                                   action:@selector(terminate:)
+                            keyEquivalent:@"q"];
+    [quitMenuItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+    [appMenu addItem:quitMenuItem];
 
     NSMenuItem *fileMenuItem = [[NSMenuItem alloc] init];
     [mainMenu addItem:fileMenuItem];

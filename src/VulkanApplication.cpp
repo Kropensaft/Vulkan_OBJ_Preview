@@ -120,7 +120,7 @@ void VulkanApplication::recreateGeometryBuffers() {
 void VulkanApplication::run() {
   appInstance = this;
 
-  window = std::make_unique<Window>(WIDTH, HEIGHT, "Vulkan OBJ Preview");
+  window = std::make_unique<Window>(WIDTH, HEIGHT, "OBJ Viewer");
 
   initVulkan();
   mainLoop();
@@ -140,7 +140,7 @@ void VulkanApplication::initVulkan() {
   createCommandPool();
 
   FileParser parser;
-  parser.parse_OBJ("../assets/teapot.obj");
+  parser.parse_OBJ("../../../../assets/teapot.obj");
 
   createVertexBuffer();
   createIndexBuffer();
@@ -153,6 +153,7 @@ void VulkanApplication::initVulkan() {
   glfwSetScrollCallback(window->getGLFWWindow(), Camera::scrollCallback);
 
   createCameraUniformBuffer();
+  createNormalMatrixUniformBuffer();
   createDescriptorPool();
   createDescriptorSets();
   updateCameraUniformBuffer();
@@ -189,6 +190,8 @@ void VulkanApplication::cleanup() {
   vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    vkDestroyBuffer(device, normalMatrixUniformBuffers[i], nullptr);
+    vkFreeMemory(device, normalMatrixUniformBuffersMemory[i], nullptr);
     vkDestroyBuffer(device, cameraUniformBuffers[i], nullptr);
     vkFreeMemory(device, cameraUniformBuffersMemory[i], nullptr);
   }
@@ -546,10 +549,18 @@ void VulkanApplication::createGraphicsPipeline() {
   cameraLayoutBinding.descriptorCount = 1;
   cameraLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+  VkDescriptorSetLayoutBinding normalMatrixLayoutBinding{};
+  normalMatrixLayoutBinding.binding = 1;
+  normalMatrixLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  normalMatrixLayoutBinding.descriptorCount = 1;
+  normalMatrixLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+  std::array<VkDescriptorSetLayoutBinding, 2> bindings = {cameraLayoutBinding, normalMatrixLayoutBinding};
+
   VkDescriptorSetLayoutCreateInfo layoutInfo{};
   layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  layoutInfo.bindingCount = 1;
-  layoutInfo.pBindings = &cameraLayoutBinding;
+  layoutInfo.bindingCount = 2;
+  layoutInfo.pBindings = bindings.data();
 
   if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
     throw std::runtime_error("Failed to create descriptor set layout!");
@@ -773,13 +784,20 @@ void VulkanApplication::updateCameraUniformBuffer() {
   ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
   ubo.proj[1][1] *= -1;
 
+  // Calculate normal matrix (transpose of inverse of model matrix)
+  ubo.normal = glm::transpose(glm::inverse(ubo.model));
+
+  // Update camera UBO
   memcpy(cameraUniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
+
+  // Update separate normal matrix buffer
+  memcpy(normalMatrixUniformBuffersMapped[currentFrame], &ubo.normal, sizeof(glm::mat4));
 }
 
 void VulkanApplication::createDescriptorPool() {
   VkDescriptorPoolSize poolSize{};
   poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  poolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT;
+  poolSize.descriptorCount = 2 * MAX_FRAMES_IN_FLIGHT;
 
   VkDescriptorPoolCreateInfo poolInfo{};
   poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -806,21 +824,37 @@ void VulkanApplication::createDescriptorSets() {
   }
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    VkDescriptorBufferInfo bufferInfo{};
-    bufferInfo.buffer = cameraUniformBuffers[i];
-    bufferInfo.offset = 0;
-    bufferInfo.range = sizeof(UniformBufferObject);
+    std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
-    VkWriteDescriptorSet descriptorWrite{};
-    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = descriptorSets[i];
-    descriptorWrite.dstBinding = 0;
-    descriptorWrite.dstArrayElement = 0;
-    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrite.descriptorCount = 1;
-    descriptorWrite.pBufferInfo = &bufferInfo;
+    // Binding 0: Camera UBO
+    VkDescriptorBufferInfo cameraBufferInfo{};
+    cameraBufferInfo.buffer = cameraUniformBuffers[i];
+    cameraBufferInfo.offset = 0;
+    cameraBufferInfo.range = sizeof(UniformBufferObject);
 
-    vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = descriptorSets[i];
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &cameraBufferInfo;
+
+    // Binding 1: Normal Matrix UBO
+    VkDescriptorBufferInfo normalMatrixBufferInfo{};
+    normalMatrixBufferInfo.buffer = normalMatrixUniformBuffers[i];
+    normalMatrixBufferInfo.offset = 0;
+    normalMatrixBufferInfo.range = sizeof(glm::mat4);
+
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = descriptorSets[i];
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pBufferInfo = &normalMatrixBufferInfo;
+
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
   }
 }
 
@@ -881,6 +915,40 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
   }
 }
 
+void VulkanApplication::createNormalMatrixUniformBuffer() {
+  VkDeviceSize bufferSize = sizeof(glm::mat4);
+  normalMatrixUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+  normalMatrixUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+  normalMatrixUniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = bufferSize;
+    bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device, &bufferInfo, nullptr, &normalMatrixUniformBuffers[i]) != VK_SUCCESS) {
+      throw std::runtime_error("Failed to create normal matrix uniform buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device, normalMatrixUniformBuffers[i], &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits,
+                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &normalMatrixUniformBuffersMemory[i]) != VK_SUCCESS) {
+      throw std::runtime_error("Failed to allocate normal matrix uniform buffer memory!");
+    }
+
+    vkBindBufferMemory(device, normalMatrixUniformBuffers[i], normalMatrixUniformBuffersMemory[i], 0);
+    vkMapMemory(device, normalMatrixUniformBuffersMemory[i], 0, bufferSize, 0, &normalMatrixUniformBuffersMapped[i]);
+  }
+}
 const VkViewport &VulkanApplication::getViewPortRef() {
   return viewport;
 }

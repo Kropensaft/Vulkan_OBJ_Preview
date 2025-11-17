@@ -6,7 +6,6 @@
 #include <stdexcept>
 #include <string>
 
-// Add Vertex method implementations
 VkVertexInputBindingDescription Vertex::getBindingDescription() {
   VkVertexInputBindingDescription bindingDescription{};
   bindingDescription.binding = 0;
@@ -15,22 +14,30 @@ VkVertexInputBindingDescription Vertex::getBindingDescription() {
   return bindingDescription;
 }
 
-std::array<VkVertexInputAttributeDescription, 2> Vertex::getAttributeDescriptions() {
-  std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+std::array<VkVertexInputAttributeDescription, 3> Vertex::getAttributeDescriptions() {
+  std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+
+  // INFO: Position attribute
   attributeDescriptions[0].binding = 0;
   attributeDescriptions[0].location = 0;
   attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
   attributeDescriptions[0].offset = offsetof(Vertex, pos);
 
+  // INFO: Color attribute
   attributeDescriptions[1].binding = 0;
   attributeDescriptions[1].location = 1;
   attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
   attributeDescriptions[1].offset = offsetof(Vertex, color);
 
+  // INFO: Normal attribute
+  attributeDescriptions[2].binding = 0;
+  attributeDescriptions[2].location = 2;
+  attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+  attributeDescriptions[2].offset = offsetof(Vertex, normal);
+
   return attributeDescriptions;
 }
 
-// Rest of your existing FileParser.cpp code...
 std::vector<Triangle> FileParser::allTriangles;
 
 const std::unordered_map<std::string_view, ObjLineType> FileParser::prefixMap = {
@@ -119,8 +126,20 @@ static void parse_texture_coord(std::string &line) {
   // TODO: Implement texture coordinate parsing
 }
 
+static std::vector<glm::vec3> temp_normals;
+
 static void parse_normal(std::string &line) {
-  // TODO: Implement normal parsing
+  glm::vec3 normal;
+  std::istringstream stream(line);
+  std::string prefix;
+
+  stream >> prefix;
+
+  if (!(stream >> normal.x >> normal.y >> normal.z)) {
+    throw std::runtime_error("Error parsing normal data");
+    return;
+  }
+  temp_normals.push_back(normal);
 }
 
 static void load_material_library(std::string &line) {
@@ -193,21 +212,24 @@ void FileParser::parse_OBJ(const char *filePath) {
   VulkanApplication::vertices.clear();
   VulkanApplication::indices.clear();
 
-  // First, create all unique vertices from temp_positions
-  for (const auto &pos : temp_positions) {
+  for (size_t i = 0; i < temp_positions.size(); ++i) {
     Vertex vertex;
-    vertex.pos = pos;
-    vertex.color = {1.0f, 1.0f, 1.0f}; // White color
+    vertex.pos = temp_positions[i];
+    vertex.color = {1.0f, 1.0f, 1.0f};
+
+    if (i < temp_normals.size()) {
+      vertex.normal = temp_normals[i];
+    } else {
+      vertex.normal = {0.0f, 1.0f, 0.0f};
+    }
+
     VulkanApplication::vertices.push_back(vertex);
   }
 
-  // Then create indices by referencing the vertex positions
   for (const auto &tri : FileParser::allTriangles) {
     for (int i = 0; i < 3; ++i) {
-      // OBJ uses 1-based indexing, convert to 0-based
       uint32_t vertexIndex = tri.vertices[i].v_idx - 1;
 
-      // Validate the index
       if (vertexIndex < VulkanApplication::vertices.size()) {
         VulkanApplication::indices.push_back(vertexIndex);
       } else {

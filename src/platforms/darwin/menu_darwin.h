@@ -1,12 +1,9 @@
 #ifndef MENU_DARWIN_H
 #define MENU_DARWIN_H
-// Use extern "C" to ensure C-style linkage, making it callable from the .mm file's C implementation
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// A function pointer type for the callback.
-// The C++ code will provide a function of this type.
 typedef void (*OpenFileCallback)(const char *filepath);
 
 typedef void (*RenderWireframeCallback)(void);
