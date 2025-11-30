@@ -1,8 +1,7 @@
 #include "DirectionalLight.h"
-#include "VulkanApplication.h" // Include the full definition here
+#include "VulkanApplication.h"
 #include <stdexcept>
 
-// --- Helper function to find a suitable memory type ---
 uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
   VkPhysicalDeviceMemoryProperties memProperties;
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
@@ -15,13 +14,11 @@ uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, Vk
   throw std::runtime_error("failed to find suitable memory type!");
 }
 
-// --- DirectionalLight Class Implementation ---
-
 DirectionalLight::DirectionalLight(VulkanApplication &app, glm::vec3 lightDirection, glm::vec4 lightColor)
     : app(app) {
 
-  // Initialize the Uniform Buffer Object data
-  ubo.direction = glm::normalize(glm::vec4(lightDirection, 0.0f)); // w=0 for a direction
+  // NOTE:  Initialize the Uniform Buffer Object data
+  ubo.direction = glm::normalize(glm::vec4(lightDirection, 0.0f));
   ubo.color = lightColor;
 
   createUniformBuffer();
@@ -35,7 +32,6 @@ DirectionalLight::~DirectionalLight() {
 void DirectionalLight::createUniformBuffer() {
   VkDeviceSize bufferSize = sizeof(DirectionalLightUBO);
 
-  // --- Create the Buffer Handle ---
   VkBufferCreateInfo bufferInfo{};
   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferInfo.size = bufferSize;
@@ -46,7 +42,6 @@ void DirectionalLight::createUniformBuffer() {
     throw std::runtime_error("failed to create uniform buffer!");
   }
 
-  // --- Allocate Memory for the Buffer ---
   VkMemoryRequirements memRequirements;
   vkGetBufferMemoryRequirements(app.getDevice(), uniformBuffer, &memRequirements);
 
@@ -60,7 +55,6 @@ void DirectionalLight::createUniformBuffer() {
     throw std::runtime_error("failed to allocate uniform buffer memory!");
   }
 
-  // --- Bind Memory and Copy Data ---
   vkBindBufferMemory(app.getDevice(), uniformBuffer, uniformBufferMemory, 0);
 
   void *data;
