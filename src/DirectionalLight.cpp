@@ -69,3 +69,28 @@ VkDescriptorBufferInfo DirectionalLight::getDescriptorInfo() const {
       0,
       sizeof(DirectionalLightUBO)};
 }
+
+glm::vec3 DirectionalLight::getDirection() const {
+  return glm::vec3(ubo.direction);
+}
+
+void DirectionalLight::updateLightSpaceMatrix(glm::mat4 matrix) {
+  ubo.lightSpaceMatrix = matrix;
+
+  void *data;
+  VkDeviceSize bufferSize = sizeof(DirectionalLightUBO);
+  vkMapMemory(app.getDevice(), uniformBufferMemory, 0, bufferSize, 0, &data);
+  // NOTE: The UBO is fully replaced to ensure consistency
+  memcpy(data, &ubo, bufferSize);
+  vkUnmapMemory(app.getDevice(), uniformBufferMemory);
+}
+
+void DirectionalLight::updateDirection(glm::vec3 newDirection) {
+  ubo.direction = glm::normalize(glm::vec4(newDirection, 0.0f));
+
+  void *data;
+  VkDeviceSize bufferSize = sizeof(DirectionalLightUBO);
+  vkMapMemory(app.getDevice(), uniformBufferMemory, 0, bufferSize, 0, &data);
+  memcpy(data, &ubo, bufferSize);
+  vkUnmapMemory(app.getDevice(), uniformBufferMemory);
+}

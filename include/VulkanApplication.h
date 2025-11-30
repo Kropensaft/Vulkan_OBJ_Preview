@@ -10,6 +10,13 @@
 #include <memory>
 #include <vector>
 #include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
+
+constexpr float orthoSize = 15.f;
+constexpr float nearPlane = .1f;
+constexpr float farPlane = 50.f;
+
+constexpr int SHADOW_MAP_WIDTH_HEIGHT = 2048;
 
 struct UniformBufferObject {
   glm::mat4 view;
@@ -74,6 +81,9 @@ private:
   void createCameraUniformBuffer();
   void createDescriptorPool();
   void createDescriptorSets();
+  void createShadowRenderPass();
+  void createShadowResources();
+  void createShadowPipeline();
   void updateCameraUniformBuffer();
   void drawFrame();
   void createNormalMatrixUniformBuffer();
@@ -81,6 +91,16 @@ private:
   uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
   VkShaderModule createShaderModule(const std::vector<char> &code);
   const VkViewport &getViewPortRef();
+
+  VkRenderPass shadowRenderPass;
+  VkImage shadowImage;
+  VkDeviceMemory shadowMemory;
+  VkImageView shadowImageView;
+  VkSampler shadowSampler;
+  VkFramebuffer shadowFrameBuffer;
+
+  VkPipeline shadowPipeline;
+  VkPipelineLayout shadowPipelineLayout;
 
   std::unique_ptr<Window> window;
   VkInstance instance;

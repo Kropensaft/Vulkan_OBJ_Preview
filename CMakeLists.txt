@@ -84,14 +84,6 @@ if(APPLE)
     find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
     target_link_libraries(${PROJECT_NAME} PRIVATE ${COCOA_FRAMEWORK} ${FOUNDATION_FRAMEWORK})
 
-    # --- Post-Build Steps ---
-    # These commands are run automatically after the main executable is built.
-    add_custom_command(
-        TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_SOURCE_DIR}/compile-shaders.sh
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Compiling GLSL shaders to SPIR-V"
-    )
     add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
