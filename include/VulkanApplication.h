@@ -2,6 +2,7 @@
 #define VULKAN_APPLICATION_H
 
 #include "CameraController.h"
+#include "DirectionalLight.h"
 #include "FileParser.h"
 #include "Window.h"
 #include <GLFW/glfw3.h>
@@ -32,6 +33,9 @@ public:
   static void toggleWireframe();
   static void zoomIn();
   static void zoomOut();
+
+  VkDevice getDevice() { return device; }
+  VkPhysicalDevice getPhysicalDevice() { return physicalDevice; }
 
   void recreateGeometryBuffers();
   void run();
@@ -113,6 +117,7 @@ private:
   std::vector<VkDeviceMemory> normalMatrixUniformBuffersMemory;
   std::vector<void *> normalMatrixUniformBuffersMapped;
 
+  std::unique_ptr<DirectionalLight> light;
   Camera camera;
   size_t currentFrame = 0;
   VkViewport viewport;

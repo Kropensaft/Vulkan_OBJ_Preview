@@ -51,6 +51,7 @@ const std::unordered_map<std::string_view, ObjLineType> FileParser::prefixMap = 
     {"usemtl", ObjLineType::USE_MATERIAL}};
 
 static std::vector<glm::vec3> temp_positions;
+static std::vector<glm::vec3> temp_normals;
 
 static VertexIndex parseVertexChunk(const std::string &chunk) {
   VertexIndex result;
@@ -125,8 +126,6 @@ static void parse_face(std::string &line) {
 static void parse_texture_coord(std::string &line) {
   // TODO: Implement texture coordinate parsing
 }
-
-static std::vector<glm::vec3> temp_normals;
 
 static void parse_normal(std::string &line) {
   glm::vec3 normal;

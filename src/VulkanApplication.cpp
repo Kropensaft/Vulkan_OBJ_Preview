@@ -1,3 +1,4 @@
+#include "DirectionalLight.h"
 #include "FileParser.h"
 #include "InputController.h"
 #include "VulkanApplication.h"
@@ -5,6 +6,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <sys/types.h>
 #include <vector>
@@ -132,6 +134,9 @@ void VulkanApplication::initVulkan() {
   createSurface();
   pickPhysicalDevice();
   createLogicalDevice();
+
+  light = std::make_unique<DirectionalLight>(*this);
+
   createSwapChain();
   createImageViews();
   createRenderPass();
@@ -195,6 +200,8 @@ void VulkanApplication::cleanup() {
     vkDestroyBuffer(device, cameraUniformBuffers[i], nullptr);
     vkFreeMemory(device, cameraUniformBuffersMemory[i], nullptr);
   }
+
+  light.reset();
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
@@ -555,11 +562,18 @@ void VulkanApplication::createGraphicsPipeline() {
   normalMatrixLayoutBinding.descriptorCount = 1;
   normalMatrixLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-  std::array<VkDescriptorSetLayoutBinding, 2> bindings = {cameraLayoutBinding, normalMatrixLayoutBinding};
+  VkDescriptorSetLayoutBinding lightUboLayoutBinding{};
+  lightUboLayoutBinding.binding = 2;
+  lightUboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  lightUboLayoutBinding.descriptorCount = 1;
+  lightUboLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+  lightUboLayoutBinding.pImmutableSamplers = nullptr;
+
+  std::array<VkDescriptorSetLayoutBinding, 3> bindings = {cameraLayoutBinding, normalMatrixLayoutBinding, lightUboLayoutBinding};
 
   VkDescriptorSetLayoutCreateInfo layoutInfo{};
   layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  layoutInfo.bindingCount = 2;
+  layoutInfo.bindingCount = static_cast<int>(bindings.size());
   layoutInfo.pBindings = bindings.data();
 
   if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
@@ -797,7 +811,7 @@ void VulkanApplication::updateCameraUniformBuffer() {
 void VulkanApplication::createDescriptorPool() {
   VkDescriptorPoolSize poolSize{};
   poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  poolSize.descriptorCount = 2 * MAX_FRAMES_IN_FLIGHT;
+  poolSize.descriptorCount = 3 * MAX_FRAMES_IN_FLIGHT;
 
   VkDescriptorPoolCreateInfo poolInfo{};
   poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -853,6 +867,16 @@ void VulkanApplication::createDescriptorSets() {
     descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptorWrites[1].descriptorCount = 1;
     descriptorWrites[1].pBufferInfo = &normalMatrixBufferInfo;
+
+    VkDescriptorBufferInfo lightBufferInfo = light->getDescriptorInfo();
+
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = descriptorSets[i];
+    descriptorWrites[1].dstBinding = 2;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pBufferInfo = &lightBufferInfo;
 
     vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
   }

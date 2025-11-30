@@ -17,7 +17,10 @@
 @implementation MenuActionTarget
 
 - (void)openFileAction:(id)sender {
+  // Add these two lines for debugging
+  NSLog(@"'openFileAction' has been triggered.");
   if (self.openFileCallback == nullptr) {
+    NSLog(@"ERROR: The openFileCallback is null. No action will be taken.");
     return;
   }
 
@@ -113,6 +116,8 @@ void create_macos_menu_bar(void *native_window_handle,
         [[NSMenuItem alloc] initWithTitle:@"Open .obj File..."
                                    action:@selector(openFileAction:)
                             keyEquivalent:@"o"];
+
+    [openItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
     [openItem setTarget:menuTarget];
     [fileMenu addItem:openItem];
 
