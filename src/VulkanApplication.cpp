@@ -13,7 +13,7 @@
 #include <vulkan/vulkan_core.h>
 
 VulkanApplication *VulkanApplication::appInstance = nullptr;
-bool VulkanApplication::renderWireframe = true;
+bool VulkanApplication::renderWireframe = false;
 PFN_vkCmdSetPolygonModeEXT VulkanApplication::vkCmdSetPolygonModeEXT = nullptr;
 float VulkanApplication::deltaTime = 0.0f;
 std::vector<Vertex> VulkanApplication::vertices;
@@ -209,6 +209,13 @@ void VulkanApplication::cleanup() {
 
   light.reset();
 
+  vkDestroyFramebuffer(device, shadowFrameBuffer, nullptr);
+  vkFreeMemory(device, shadowMemory, nullptr);
+  vkDestroySampler(device, shadowSampler, nullptr);
+
+  vkDestroyImageView(device, shadowImageView, nullptr);
+  vkDestroyImage(device, shadowImage, nullptr);
+
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
     vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
@@ -218,9 +225,15 @@ void VulkanApplication::cleanup() {
   for (auto framebuffer : swapChainFramebuffers) {
     vkDestroyFramebuffer(device, framebuffer, nullptr);
   }
+
+  vkDestroyPipeline(device, shadowPipeline, nullptr);
+  vkDestroyPipelineLayout(device, shadowPipelineLayout, nullptr);
+  vkDestroyRenderPass(device, shadowRenderPass, nullptr);
+
   vkDestroyPipeline(device, graphicsPipeline, nullptr);
   vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
   vkDestroyRenderPass(device, renderPass, nullptr);
+
   for (auto imageView : swapChainImageViews) {
     vkDestroyImageView(device, imageView, nullptr);
   }
@@ -810,7 +823,6 @@ void VulkanApplication::updateCameraUniformBuffer() {
   ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
   ubo.proj[1][1] *= -1;
 
-  // Calculate normal matrix (transpose of inverse of model matrix)
   ubo.normal = glm::transpose(glm::inverse(ubo.model));
 
   glm::mat4 lightProjection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, nearPlane, farPlane);
@@ -826,10 +838,8 @@ void VulkanApplication::updateCameraUniformBuffer() {
 
   light->updateLightSpaceMatrix(lightSpaceMatrix);
 
-  // Update camera UBO
   memcpy(cameraUniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
 
-  // Update separate normal matrix buffer
   memcpy(normalMatrixUniformBuffersMapped[currentFrame], &ubo.normal, sizeof(glm::mat4));
 }
 
@@ -923,25 +933,17 @@ void VulkanApplication::createDescriptorSets() {
   }
 }
 
-// In VulkanApplication.cpp
-
 void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
 
-  // 1. START COMMAND BUFFER RECORDING (MUST BE FIRST)
   VkCommandBufferBeginInfo beginInfo{};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
   if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
     throw std::runtime_error("failed to begin recording command buffer!");
   }
-  // ---------------------------------------------------------------------
 
   VkBuffer vertexBuffers[] = {vertexBuffer};
   VkDeviceSize offsets[] = {0};
-
-  // ====================================================================
-  // 2. SHADOW PASS (Generate Depth Map)
-  // ====================================================================
 
   VkClearValue shadowClearValue = {};
   shadowClearValue.depthStencil = {1.0f, 0};
@@ -949,9 +951,8 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
   VkRenderPassBeginInfo shadowPassInfo{};
   shadowPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
   shadowPassInfo.renderPass = shadowRenderPass;
-  shadowPassInfo.framebuffer = shadowFrameBuffer; // Using your variable name
+  shadowPassInfo.framebuffer = shadowFrameBuffer;
   shadowPassInfo.renderArea.offset = {0, 0};
-  // Using your variable name
   shadowPassInfo.renderArea.extent = {SHADOW_MAP_WIDTH_HEIGHT, SHADOW_MAP_WIDTH_HEIGHT};
   shadowPassInfo.clearValueCount = 1;
   shadowPassInfo.pClearValues = &shadowClearValue;
@@ -986,10 +987,6 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
   vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
   vkCmdEndRenderPass(commandBuffer);
-
-  // ====================================================================
-  // 3. MAIN RENDER PASS (Final Scene Render)
-  // ====================================================================
 
   VkRenderPassBeginInfo renderPassInfo{};
   renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1034,7 +1031,6 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
 
   vkCmdEndRenderPass(commandBuffer);
 
-  // 4. END COMMAND BUFFER RECORDING (MUST BE LAST)
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
     throw std::runtime_error("failed to record command buffer!");
   }
@@ -1203,7 +1199,6 @@ void VulkanApplication::createShadowRenderPass() {
 }
 
 void VulkanApplication::createShadowPipeline() {
-  // 1. Load the new shadow shaders
   auto vertShaderCode = readFile("shaders/shadow_vert.spv");
   auto fragShaderCode = readFile("shaders/shadow_frag.spv");
 
@@ -1224,7 +1219,6 @@ void VulkanApplication::createShadowPipeline() {
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-  // 2. Vertex Input: Reuse your Vertex struct
   auto bindingDescription = Vertex::getBindingDescription();
   auto attributeDescriptions = Vertex::getAttributeDescriptions();
 
@@ -1232,7 +1226,6 @@ void VulkanApplication::createShadowPipeline() {
   vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
   vertexInputInfo.vertexBindingDescriptionCount = 1;
   vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-  // We pass all attributes but the shadow shader only uses position
   vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
   vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
@@ -1240,35 +1233,29 @@ void VulkanApplication::createShadowPipeline() {
   inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
   inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
-  // 3. Viewport & Scissor (Dynamic)
   VkPipelineViewportStateCreateInfo viewportState{};
   viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
   viewportState.viewportCount = 1;
   viewportState.scissorCount = 1;
 
-  // 4. Rasterizer: CRITICAL FOR SHADOWS
   VkPipelineRasterizationStateCreateInfo rasterizer{};
   rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
   rasterizer.depthClampEnable = VK_FALSE;
   rasterizer.rasterizerDiscardEnable = VK_FALSE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
-  // Fix "Peter Panning": Culling front faces when rendering the shadow map
-  rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
+  rasterizer.cullMode = VK_CULL_MODE_NONE;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
-  // Fix "Shadow Acne": Depth Bias
   rasterizer.depthBiasEnable = VK_TRUE;
   rasterizer.depthBiasConstantFactor = 1.25f; // Tweakable
   rasterizer.depthBiasSlopeFactor = 1.75f;    // Tweakable
   rasterizer.depthBiasClamp = 0.0f;
 
-  // 5. Multisampling (Disabled)
   VkPipelineMultisampleStateCreateInfo multisampling{};
   multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
   multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-  // 6. Depth Stencil (Enabled)
   VkPipelineDepthStencilStateCreateInfo depthStencil{};
   depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
   depthStencil.depthTestEnable = VK_TRUE;
@@ -1277,14 +1264,12 @@ void VulkanApplication::createShadowPipeline() {
   depthStencil.depthBoundsTestEnable = VK_FALSE;
   depthStencil.stencilTestEnable = VK_FALSE;
 
-  // 7. Color Blending (Disabled - no color buffer)
   VkPipelineColorBlendStateCreateInfo colorBlending{};
   colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
   colorBlending.logicOpEnable = VK_FALSE;
-  colorBlending.attachmentCount = 0; // CRITICAL: 0 attachments
+  colorBlending.attachmentCount = 0;
   colorBlending.pAttachments = nullptr;
 
-  // 8. Dynamic States
   std::vector<VkDynamicState> dynamicStates = {
       VK_DYNAMIC_STATE_VIEWPORT,
       VK_DYNAMIC_STATE_SCISSOR,
@@ -1295,7 +1280,6 @@ void VulkanApplication::createShadowPipeline() {
   dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
   dynamicStateInfo.pDynamicStates = dynamicStates.data();
 
-  // 9. Pipeline Layout: Reuse the main descriptor set layout
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipelineLayoutInfo.setLayoutCount = 1;
@@ -1305,7 +1289,6 @@ void VulkanApplication::createShadowPipeline() {
     throw std::runtime_error("failed to create shadow pipeline layout!");
   }
 
-  // 10. Create the Pipeline
   VkGraphicsPipelineCreateInfo pipelineInfo{};
   pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
   pipelineInfo.stageCount = 2;
@@ -1319,11 +1302,10 @@ void VulkanApplication::createShadowPipeline() {
   pipelineInfo.pColorBlendState = &colorBlending;
   pipelineInfo.pDynamicState = &dynamicStateInfo;
   pipelineInfo.layout = shadowPipelineLayout;
-  pipelineInfo.renderPass = shadowRenderPass; // Use the dedicated shadow pass
+  pipelineInfo.renderPass = shadowRenderPass;
   pipelineInfo.subpass = 0;
 
   if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &shadowPipeline) != VK_SUCCESS) {
-    // If this fails, the crash will happen. Check shader file paths!
     throw std::runtime_error("FATAL: Failed to create shadow pipeline! (Check .spv files)");
   }
 

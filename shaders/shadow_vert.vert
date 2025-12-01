@@ -1,8 +1,11 @@
 #version 450
 
 layout(location = 0) in vec3 inPosition;
+layout(location = 1) in vec3 inColor;
+layout(location = 2) in vec3 inNormal;
+layout(location = 3) in vec2 inTexCoord;
 
-layout(binding = 0) uniform UniformBufferObject {
+layout(binding = 0) uniform CameraUBO {
     mat4 view;
     mat4 proj;
     mat4 model;
@@ -15,5 +18,7 @@ layout(binding = 2) uniform LightUbo {
 } light;
 
 void main() {
-    gl_Position = light.lightSpaceMatrix * ubo.model * vec4(inPosition, 1.0);
+    vec4 worldPos = ubo.model * vec4(inPosition, 1.0);
+    
+    gl_Position = light.lightSpaceMatrix * worldPos;
 }
