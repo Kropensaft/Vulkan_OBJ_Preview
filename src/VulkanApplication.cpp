@@ -310,7 +310,11 @@ void VulkanApplication::createInstance() {
   createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   createInfo.ppEnabledExtensionNames = extensions.data();
 
-  const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
+  // INFO: DISABLE VALIDATION LAYERS WITH THIS
+  const std::vector<const char *> validationLayers = {};
+
+  //  const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
+
   createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
   createInfo.ppEnabledLayerNames = validationLayers.data();
 
@@ -553,7 +557,7 @@ void VulkanApplication::createGraphicsPipeline() {
   rasterizer.lineWidth = 1.0f;
   rasterizer.cullMode = VK_CULL_MODE_NONE;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-  rasterizer.depthBiasEnable = VK_TRUE;
+  rasterizer.depthBiasEnable = VK_FALSE;
 
   VkPipelineMultisampleStateCreateInfo multisampling{};
   multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -1277,12 +1281,12 @@ void VulkanApplication::createShadowPipeline() {
   rasterizer.rasterizerDiscardEnable = VK_FALSE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
-  rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
+  rasterizer.cullMode = VK_CULL_MODE_NONE;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
-  rasterizer.depthBiasEnable = VK_FALSE;
-  rasterizer.depthBiasConstantFactor = 1.25f; // Tweakable
-  rasterizer.depthBiasSlopeFactor = 1.75f;    // Tweakable
+  rasterizer.depthBiasEnable = VK_TRUE;
+  rasterizer.depthBiasConstantFactor = 4.f; // Tweakable
+  rasterizer.depthBiasSlopeFactor = 1.5f;   // Tweakable
   rasterizer.depthBiasClamp = 0.0f;
 
   VkPipelineMultisampleStateCreateInfo multisampling{};

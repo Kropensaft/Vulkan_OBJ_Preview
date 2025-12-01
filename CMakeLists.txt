@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.12)
 
 # Project name and language
 project(VulkanApp CXX)
+add_compile_definitions(GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
-# --- ADD THIS LINE ---
 # Always generate the compile_commands.json file for the language server (clangd)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

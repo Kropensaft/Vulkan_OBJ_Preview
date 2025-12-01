@@ -5,9 +5,6 @@
 #include "DirectionalLight.h"
 #include "FileParser.h"
 #include "Window.h"
-
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <memory>
