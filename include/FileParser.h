@@ -37,6 +37,7 @@ enum class ObjLineType {
   OBJECT,
   MATERIAL_LIBRARY,
   USE_MATERIAL,
+  COMMENT,
   UNKNOWN,
 };
 

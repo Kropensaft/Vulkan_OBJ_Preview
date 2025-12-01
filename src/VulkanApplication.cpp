@@ -198,7 +198,8 @@ void VulkanApplication::cleanup() {
   cleanupGeometryBuffers();
 
   vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-  vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+  vkDestroyDescriptorSetLayout(device, globalSetLayout, nullptr);
+  vkDestroyDescriptorSetLayout(device, textureSetLayout, nullptr);
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vkDestroyBuffer(device, normalMatrixUniformBuffers[i], nullptr);
@@ -588,27 +589,37 @@ void VulkanApplication::createGraphicsPipeline() {
   lightUboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
   lightUboLayoutBinding.pImmutableSamplers = nullptr;
 
+  std::array<VkDescriptorSetLayoutBinding, 3> globalBindings = {cameraLayoutBinding, normalMatrixLayoutBinding, lightUboLayoutBinding};
+
+  VkDescriptorSetLayoutCreateInfo globalInfo{};
+  globalInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  globalInfo.bindingCount = static_cast<uint32_t>(globalBindings.size());
+  globalInfo.pBindings = globalBindings.data();
+
+  if (vkCreateDescriptorSetLayout(device, &globalInfo, nullptr, &globalSetLayout) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to create global descriptor set layout!");
+  }
+
   VkDescriptorSetLayoutBinding shadowMapLayoutBinding{};
-  shadowMapLayoutBinding.binding = 3;
+  shadowMapLayoutBinding.binding = 0;
   shadowMapLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
   shadowMapLayoutBinding.descriptorCount = 1;
   shadowMapLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-  std::array<VkDescriptorSetLayoutBinding, 4> bindings = {cameraLayoutBinding, normalMatrixLayoutBinding, lightUboLayoutBinding, shadowMapLayoutBinding};
+  VkDescriptorSetLayoutCreateInfo textureInfo{};
+  textureInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  textureInfo.bindingCount = 1;
+  textureInfo.pBindings = &shadowMapLayoutBinding;
 
-  VkDescriptorSetLayoutCreateInfo layoutInfo{};
-  layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  layoutInfo.bindingCount = static_cast<int>(bindings.size());
-  layoutInfo.pBindings = bindings.data();
-
-  if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to create descriptor set layout!");
+  if (vkCreateDescriptorSetLayout(device, &textureInfo, nullptr, &textureSetLayout) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to create texture descriptor set layout!");
   }
 
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutInfo.setLayoutCount = 1;
-  pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+  std::array<VkDescriptorSetLayout, 2> layouts = {globalSetLayout, textureSetLayout};
+  pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(layouts.size());
+  pipelineLayoutInfo.pSetLayouts = layouts.data();
 
   if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
     throw std::runtime_error("failed to create pipeline layout!");
@@ -856,7 +867,7 @@ void VulkanApplication::createDescriptorPool() {
   poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
   poolInfo.pPoolSizes = poolSizes.data();
-  poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
+  poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT * 2;
 
   if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
     throw std::runtime_error("failed to create descriptor pool!");
@@ -864,72 +875,85 @@ void VulkanApplication::createDescriptorPool() {
 }
 
 void VulkanApplication::createDescriptorSets() {
-  std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
-  VkDescriptorSetAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  allocInfo.descriptorPool = descriptorPool;
-  allocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
-  allocInfo.pSetLayouts = layouts.data();
+  // 1. Allocate Global Sets (Set 0)
+  std::vector<VkDescriptorSetLayout> globalLayouts(MAX_FRAMES_IN_FLIGHT, globalSetLayout);
+  VkDescriptorSetAllocateInfo globalAllocInfo{};
+  globalAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  globalAllocInfo.descriptorPool = descriptorPool;
+  globalAllocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+  globalAllocInfo.pSetLayouts = globalLayouts.data();
 
-  descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-  if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
-    throw std::runtime_error("failed to allocate descriptor sets!");
+  globalDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+  if (vkAllocateDescriptorSets(device, &globalAllocInfo, globalDescriptorSets.data()) != VK_SUCCESS) {
+    throw std::runtime_error("failed to allocate global descriptor sets!");
   }
 
+  // 2. Allocate Texture Sets (Set 1)
+  std::vector<VkDescriptorSetLayout> textureLayouts(MAX_FRAMES_IN_FLIGHT, textureSetLayout);
+  VkDescriptorSetAllocateInfo textureAllocInfo{};
+  textureAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  textureAllocInfo.descriptorPool = descriptorPool;
+  textureAllocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+  textureAllocInfo.pSetLayouts = textureLayouts.data();
+
+  textureDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+  if (vkAllocateDescriptorSets(device, &textureAllocInfo, textureDescriptorSets.data()) != VK_SUCCESS) {
+    throw std::runtime_error("failed to allocate texture descriptor sets!");
+  }
+
+  // 3. Update Descriptors
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
+    VkDescriptorBufferInfo cameraInfo{};
+    cameraInfo.buffer = cameraUniformBuffers[i];
+    cameraInfo.offset = 0;
+    cameraInfo.range = sizeof(UniformBufferObject);
 
-    // Binding 0: Camera UBO
-    VkDescriptorBufferInfo cameraBufferInfo{};
-    cameraBufferInfo.buffer = cameraUniformBuffers[i];
-    cameraBufferInfo.offset = 0;
-    cameraBufferInfo.range = sizeof(UniformBufferObject);
+    VkDescriptorBufferInfo normalInfo{};
+    normalInfo.buffer = normalMatrixUniformBuffers[i];
+    normalInfo.offset = 0;
+    normalInfo.range = sizeof(glm::mat4);
 
-    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = descriptorSets[i];
-    descriptorWrites[0].dstBinding = 0;
-    descriptorWrites[0].dstArrayElement = 0;
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].pBufferInfo = &cameraBufferInfo;
+    VkDescriptorBufferInfo lightInfo = light->getDescriptorInfo();
 
-    // Binding 1: Normal Matrix UBO
-    VkDescriptorBufferInfo normalMatrixBufferInfo{};
-    normalMatrixBufferInfo.buffer = normalMatrixUniformBuffers[i];
-    normalMatrixBufferInfo.offset = 0;
-    normalMatrixBufferInfo.range = sizeof(glm::mat4);
+    std::array<VkWriteDescriptorSet, 3> globalWrites{};
 
-    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[1].dstSet = descriptorSets[i];
-    descriptorWrites[1].dstBinding = 1;
-    descriptorWrites[1].dstArrayElement = 0;
-    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[1].descriptorCount = 1;
-    descriptorWrites[1].pBufferInfo = &normalMatrixBufferInfo;
+    globalWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    globalWrites[0].dstSet = globalDescriptorSets[i];
+    globalWrites[0].dstBinding = 0;
+    globalWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    globalWrites[0].descriptorCount = 1;
+    globalWrites[0].pBufferInfo = &cameraInfo;
 
-    VkDescriptorBufferInfo lightBufferInfo = light->getDescriptorInfo();
+    globalWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    globalWrites[1].dstSet = globalDescriptorSets[i];
+    globalWrites[1].dstBinding = 1;
+    globalWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    globalWrites[1].descriptorCount = 1;
+    globalWrites[1].pBufferInfo = &normalInfo;
 
-    descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[2].dstSet = descriptorSets[i];
-    descriptorWrites[2].dstBinding = 2;
-    descriptorWrites[2].dstArrayElement = 0;
-    descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[2].descriptorCount = 1;
-    descriptorWrites[2].pBufferInfo = &lightBufferInfo;
+    globalWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    globalWrites[2].dstSet = globalDescriptorSets[i];
+    globalWrites[2].dstBinding = 2;
+    globalWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    globalWrites[2].descriptorCount = 1;
+    globalWrites[2].pBufferInfo = &lightInfo;
+
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(globalWrites.size()), globalWrites.data(), 0, nullptr);
 
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     imageInfo.imageView = shadowImageView;
     imageInfo.sampler = shadowSampler;
 
-    descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[3].dstSet = descriptorSets[i];
-    descriptorWrites[3].dstBinding = 3;
-    descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptorWrites[3].descriptorCount = 1;
-    descriptorWrites[3].pImageInfo = &imageInfo;
+    VkWriteDescriptorSet textureWrite{};
+    textureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    textureWrite.dstSet = textureDescriptorSets[i];
+    textureWrite.dstBinding = 0; // Binding 0 in Set 1
+    textureWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    textureWrite.descriptorCount = 1;
+    textureWrite.pImageInfo = &imageInfo;
 
-    vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+    vkUpdateDescriptorSets(device, 1, &textureWrite, 0, nullptr);
   }
 }
 
@@ -979,7 +1003,7 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
 
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           shadowPipelineLayout, 0, 1,
-                          &descriptorSets[currentFrame], 0, nullptr);
+                          &globalDescriptorSets[currentFrame], 0, nullptr);
 
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
   vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
@@ -1019,7 +1043,16 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
       pipelineLayout,
       0,
       1,
-      &descriptorSets[currentFrame],
+      &globalDescriptorSets[currentFrame],
+      0, nullptr);
+
+  vkCmdBindDescriptorSets(
+      commandBuffer,
+      VK_PIPELINE_BIND_POINT_GRAPHICS,
+      pipelineLayout,
+      1,
+      1,
+      &textureDescriptorSets[currentFrame],
       0, nullptr);
 
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
@@ -1244,10 +1277,10 @@ void VulkanApplication::createShadowPipeline() {
   rasterizer.rasterizerDiscardEnable = VK_FALSE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
-  rasterizer.cullMode = VK_CULL_MODE_NONE;
+  rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
-  rasterizer.depthBiasEnable = VK_TRUE;
+  rasterizer.depthBiasEnable = VK_FALSE;
   rasterizer.depthBiasConstantFactor = 1.25f; // Tweakable
   rasterizer.depthBiasSlopeFactor = 1.75f;    // Tweakable
   rasterizer.depthBiasClamp = 0.0f;
@@ -1283,7 +1316,7 @@ void VulkanApplication::createShadowPipeline() {
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipelineLayoutInfo.setLayoutCount = 1;
-  pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout; // Reuse main layout
+  pipelineLayoutInfo.pSetLayouts = &globalSetLayout; // Reuse main layout
 
   if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &shadowPipelineLayout) != VK_SUCCESS) {
     throw std::runtime_error("failed to create shadow pipeline layout!");

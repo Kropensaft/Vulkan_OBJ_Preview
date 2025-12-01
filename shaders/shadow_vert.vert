@@ -5,13 +5,13 @@ layout(location = 1) in vec3 inColor;
 layout(location = 2) in vec3 inNormal;
 layout(location = 3) in vec2 inTexCoord;
 
-layout(binding = 0) uniform CameraUBO {
+layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 view;
     mat4 proj;
     mat4 model;
 } ubo;
 
-layout(binding = 2) uniform LightUbo {
+layout(set = 0, binding = 2) uniform LightUbo {
     vec4 direction;
     vec4 color;
     mat4 lightSpaceMatrix; 

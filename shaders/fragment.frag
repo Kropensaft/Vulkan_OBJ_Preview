@@ -5,13 +5,13 @@ layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec3 fragPos;
 layout(location = 3) in vec4 fragPosLightSpace; 
 
-layout(binding = 2) uniform LightUbo {
+layout(set=0, binding = 2) uniform LightUbo {
     vec4 direction;
     vec4 color;
     mat4 lightSpaceMatrix;
 } light;
 
-layout(binding = 3) uniform sampler2D shadowMap; 
+layout(set = 1, binding = 0) uniform sampler2D shadowMap; 
 
 layout(location = 0) out vec4 outColor;
 
@@ -25,7 +25,7 @@ float calculateShadow(vec4 lightSpacePos) {
 
     float closestDepth = texture(shadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
-    float bias = 0.0005;
+    float bias = 0.00005;
     float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
     
     return shadow; 

@@ -10,17 +10,17 @@ layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec3 fragPos;          
 layout(location = 3) out vec4 fragPosLightSpace; 
 
-layout(binding = 0) uniform CameraUBO {
+layout(set=0, binding = 0) uniform CameraUBO {
     mat4 view;
     mat4 proj;
     mat4 model;
 } ubo;
 
-layout(binding = 1) uniform NormalMatrixUBO {
+layout(set = 0,binding = 1) uniform NormalMatrixUBO {
     mat4 normal; 
 } normal_ubo;
 
-layout(binding = 2) uniform LightUbo {
+layout(set = 0, binding = 2) uniform LightUbo {
     vec4 direction;
     vec4 color;
     mat4 lightSpaceMatrix; 

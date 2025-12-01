@@ -24,7 +24,7 @@ public:
   DirectionalLight(
       VulkanApplication &app,
       glm::vec3 lightDirection = glm::vec3(-1.f, -1.0f, -1.f),
-      glm::vec4 lightColor = glm::vec4(GREEN, 1.f));
+      glm::vec4 lightColor = glm::vec4(WHITE, 1.f));
 
   ~DirectionalLight();
 

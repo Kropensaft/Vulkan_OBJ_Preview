@@ -53,6 +53,7 @@ const std::unordered_map<std::string_view, ObjLineType> FileParser::prefixMap = 
     {"f", ObjLineType::FACE},
     {"g", ObjLineType::GROUP},
     {"o", ObjLineType::OBJECT},
+    {"#", ObjLineType::COMMENT},
     {"mtllib", ObjLineType::MATERIAL_LIBRARY},
     {"usemtl", ObjLineType::USE_MATERIAL}};
 
@@ -207,6 +208,8 @@ void FileParser::parse_OBJ(const char *filePath) {
     case ObjLineType::OBJECT:
       parse_object(line);
       break;
+    case ObjLineType::COMMENT:
+      std::cout << std::format("Parsed comment {}", line);
     case ObjLineType::UNKNOWN:
       std::cout << "Unknown line type encountered" << std::endl;
       break;

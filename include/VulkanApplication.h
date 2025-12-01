@@ -132,9 +132,13 @@ private:
   std::vector<VkBuffer> cameraUniformBuffers;
   std::vector<VkDeviceMemory> cameraUniformBuffersMemory;
   std::vector<void *> cameraUniformBuffersMapped;
-  VkDescriptorSetLayout descriptorSetLayout;
   VkDescriptorPool descriptorPool;
-  std::vector<VkDescriptorSet> descriptorSets;
+
+  VkDescriptorSetLayout globalSetLayout;
+  VkDescriptorSetLayout textureSetLayout;
+
+  std::vector<VkDescriptorSet> globalDescriptorSets;
+  std::vector<VkDescriptorSet> textureDescriptorSets;
 
   std::vector<VkBuffer> normalMatrixUniformBuffers;
   std::vector<VkDeviceMemory> normalMatrixUniformBuffersMemory;
