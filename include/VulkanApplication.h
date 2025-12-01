@@ -16,7 +16,7 @@ constexpr float orthoSize = 15.f;
 constexpr float nearPlane = .1f;
 constexpr float farPlane = 50.f;
 
-constexpr int SHADOW_MAP_WIDTH_HEIGHT = 2048;
+constexpr int SHADOW_MAP_WIDTH_HEIGHT = 4096;
 
 struct UniformBufferObject {
   glm::mat4 view;
@@ -88,6 +88,10 @@ private:
   void drawFrame();
   void createNormalMatrixUniformBuffer();
   void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+  void createDepthResources();
+  VkFormat findDepthFormat();
+  VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+  bool hasStencilComponent(VkFormat format);
   uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
   VkShaderModule createShaderModule(const std::vector<char> &code);
   const VkViewport &getViewPortRef();
@@ -101,6 +105,10 @@ private:
 
   VkPipeline shadowPipeline;
   VkPipelineLayout shadowPipelineLayout;
+
+  VkImage depthImage;
+  VkDeviceMemory depthImageMemory;
+  VkImageView depthImageView;
 
   std::unique_ptr<Window> window;
   VkInstance instance;
