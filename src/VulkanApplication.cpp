@@ -317,9 +317,9 @@ void VulkanApplication::createInstance() {
   createInfo.ppEnabledExtensionNames = extensions.data();
 
   // INFO: DISABLE VALIDATION LAYERS WITH THIS
-  const std::vector<const char *> validationLayers = {};
+  // const std::vector<const char *> validationLayers = {};
 
-  //  const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
+  const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
 
   createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
   createInfo.ppEnabledLayerNames = validationLayers.data();
@@ -1041,7 +1041,7 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
 
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline);
 
-  vkCmdSetDepthBias(commandBuffer, 1.25f, 0.0f, 1.75f);
+  vkCmdSetDepthBias(commandBuffer, 0.0f, 0.0f, 0.0f);
 
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           shadowPipelineLayout, 0, 1,
@@ -1061,9 +1061,11 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
   renderPassInfo.renderArea.offset = {0, 0};
   renderPassInfo.renderArea.extent = swapChainExtent;
 
-  VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-  renderPassInfo.clearValueCount = 1;
-  renderPassInfo.pClearValues = &clearColor;
+  std::array<VkClearValue, 2> clearValues{};
+  clearValues[0].color = {{1.0f, 1.0f, 1.0f, 1.0f}};
+  clearValues[1].depthStencil = {1.0f, 0};
+  renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+  renderPassInfo.pClearValues = clearValues.data();
 
   vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1319,12 +1321,12 @@ void VulkanApplication::createShadowPipeline() {
   rasterizer.rasterizerDiscardEnable = VK_FALSE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
-  rasterizer.cullMode = VK_CULL_MODE_NONE;
+  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
   rasterizer.depthBiasEnable = VK_TRUE;
-  rasterizer.depthBiasConstantFactor = 7.f; // Tweakable
-  rasterizer.depthBiasSlopeFactor = 3.f;    // Tweakable
+  rasterizer.depthBiasConstantFactor = 0.f; // Tweakable
+  rasterizer.depthBiasSlopeFactor = 0.f;    // Tweakable
   rasterizer.depthBiasClamp = 0.0f;
 
   VkPipelineMultisampleStateCreateInfo multisampling{};

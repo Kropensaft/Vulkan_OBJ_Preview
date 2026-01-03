@@ -15,7 +15,7 @@ layout(set = 1, binding = 0) uniform sampler2D shadowMap;
 
 layout(location = 0) out vec4 outColor;
 
-float calculateShadow(vec4 lightSpacePos) {
+float calculateShadow(vec4 lightSpacePos, float bias) {
     vec3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
     projCoords.xy = projCoords.xy * 0.5 + 0.5;
 
@@ -31,25 +31,31 @@ float calculateShadow(vec4 lightSpacePos) {
     for(int x = -1; x <= 1; ++x) {
         for(int y = -1; y <= 1; ++y) {
             float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
-            shadow += currentDepth - 0.005 > pcfDepth ? 1.0 : 0.0;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
         }
     }
-    shadow /= 16.0; 
+    shadow /= 9.0; 
 
     return shadow;
 }
 
 void main() {
+
     vec3 normal = normalize(fragNormal);
     vec3 lightDir = normalize(-light.direction.xyz);
-    float shadowFactor = calculateShadow(fragPosLightSpace);
+
+    float bias = 0.0;
+
+    float shadowFactor = calculateShadow(fragPosLightSpace, bias);
     
     vec3 ambient = light.color.xyz * 0.1;
     float diff = max(dot(normal, lightDir), 0.0);
     vec3 diffuse = light.color.xyz * diff;
     
-    diffuse = diffuse * (1.0 - shadowFactor); 
+    float shadowIntensity = 0.5; 
+    diffuse = diffuse * (1.0 - shadowFactor * shadowIntensity);
     vec3 finalColor = ambient + diffuse; 
     
-    outColor = vec4(finalColor * fragColor, 1.0);
+    vec3 objectColor = vec3(0.4, 0.4, 0.4); // Dark Grey
+    outColor = vec4(finalColor * objectColor, 1.0);
 }
