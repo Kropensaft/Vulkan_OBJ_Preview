@@ -162,6 +162,13 @@ void VulkanApplication::initVulkan() {
 
   camera.CameraInit();
 
+  auto eye = camera.GetEye();
+  auto lookat = camera.GetLookAt();
+  glm::vec3 light_init_direction = glm::normalize(lookat - eye);
+
+  light->setDirection(light_init_direction);
+  std::cout << "Setting initial light direction to " << light_init_direction << std::endl;
+
   glfwSetWindowUserPointer(window->getGLFWWindow(), &camera);
   glfwSetScrollCallback(window->getGLFWWindow(), Camera::scrollCallback);
 
@@ -1041,6 +1048,15 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
 
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline);
 
+  glm::mat4 modelMatrix = glm::mat4(1.0f);
+  vkCmdPushConstants(
+      commandBuffer,
+      shadowPipelineLayout,
+      VK_SHADER_STAGE_VERTEX_BIT,
+      0,
+      sizeof(glm::mat4),
+      &modelMatrix);
+
   vkCmdSetDepthBias(commandBuffer, 0.0f, 0.0f, 0.0f);
 
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1160,7 +1176,7 @@ void VulkanApplication::createShadowResources() {
   imageInfo.extent.depth = 1;
   imageInfo.mipLevels = 1;
   imageInfo.arrayLayers = 1;
-  imageInfo.format = VK_FORMAT_D16_UNORM;
+  imageInfo.format = VK_FORMAT_D32_SFLOAT;
   imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
   imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   // PERF: Usage must include DEPTH_STENCIL_ATTACHMENT (to write) and SAMPLED (to read)
@@ -1190,7 +1206,7 @@ void VulkanApplication::createShadowResources() {
   viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   viewInfo.image = shadowImage;
   viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  viewInfo.format = VK_FORMAT_D16_UNORM;
+  viewInfo.format = VK_FORMAT_D32_SFLOAT;
   viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
   viewInfo.subresourceRange.baseMipLevel = 0;
   viewInfo.subresourceRange.levelCount = 1;
@@ -1235,7 +1251,7 @@ void VulkanApplication::createShadowResources() {
 
 void VulkanApplication::createShadowRenderPass() {
   VkAttachmentDescription depthAttachment{};
-  depthAttachment.format = VK_FORMAT_D16_UNORM;
+  depthAttachment.format = VK_FORMAT_D32_SFLOAT;
   depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
   depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1357,10 +1373,18 @@ void VulkanApplication::createShadowPipeline() {
   dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
   dynamicStateInfo.pDynamicStates = dynamicStates.data();
 
+  VkPushConstantRange pushConstantRange{};
+  pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  pushConstantRange.offset = 0;
+  pushConstantRange.size = sizeof(glm::mat4);
+
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipelineLayoutInfo.setLayoutCount = 1;
   pipelineLayoutInfo.pSetLayouts = &globalSetLayout; // Reuse main layout
+
+  pipelineLayoutInfo.pushConstantRangeCount = 1;
+  pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
   if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &shadowPipelineLayout) != VK_SUCCESS) {
     throw std::runtime_error("failed to create shadow pipeline layout!");

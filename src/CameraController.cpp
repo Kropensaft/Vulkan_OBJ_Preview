@@ -16,9 +16,9 @@ void Camera::SetCameraView(glm::vec3 eye, glm::vec3 lookat, glm::vec3 up) {
 }
 
 void Camera::CameraInit() {
-  glm::vec3 eye(5.0f, 5.0f, 5.0f);
-  glm::vec3 lookat(0.0f, 0.0f, 0.0f); // Keep looking at the origin
-  glm::vec3 up(0.0f, 1.0f, 0.0f);     // Keep Y as the up direction
+  glm::vec3 eye(0.332f, 8.689f, -10.857f); // High up and far forward on the Z-axis
+  glm::vec3 lookat(0.0f, 0.0f, 0.0f);      // Keep looking at the origin
+  glm::vec3 up(0.0f, 1.0f, 0.0f);          // Keep Y as the up direction
   SetCameraView(eye, lookat, up);
   // Initialize mouse tracking variables
   lastMouseX = 0.0f;

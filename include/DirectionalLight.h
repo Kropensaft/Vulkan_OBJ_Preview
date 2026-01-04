@@ -31,6 +31,7 @@ public:
   void updateDirection(glm::vec3 newDirection);
   void updateLightSpaceMatrix(glm::mat4 mat);
   glm::vec3 getDirection() const;
+  void setDirection(glm::vec3 newDirection);
 
   DirectionalLight(const DirectionalLight &) = delete;
   DirectionalLight &operator=(const DirectionalLight &) = delete;

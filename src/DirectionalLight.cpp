@@ -70,6 +70,10 @@ VkDescriptorBufferInfo DirectionalLight::getDescriptorInfo() const {
       sizeof(DirectionalLightUBO)};
 }
 
+void DirectionalLight::setDirection(glm::vec3 newDirection) {
+  ubo.direction = glm::vec4(glm::normalize(newDirection), 0.0f);
+}
+
 glm::vec3 DirectionalLight::getDirection() const {
   return glm::vec3(ubo.direction);
 }

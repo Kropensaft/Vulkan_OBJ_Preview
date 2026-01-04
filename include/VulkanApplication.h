@@ -1,12 +1,14 @@
 #ifndef VULKAN_APPLICATION_H
 #define VULKAN_APPLICATION_H
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include "CameraController.h"
 #include "DirectionalLight.h"
 #include "FileParser.h"
 #include "Window.h"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/gtx/io.hpp>
 #include <memory>
 #include <vector>
 #include <vulkan/vulkan.h>
