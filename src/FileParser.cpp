@@ -108,18 +108,20 @@ static void parse_face(std::string &line) {
   std::string chunk;
   while (lineStream >> chunk) {
     VertexIndex vi = parseVertexChunk(chunk);
+    // Validate the vertex index exists
     if (vi.v_idx > 0 && vi.v_idx <= temp_positions.size()) {
       parsedIndices.push_back(vi);
     } else {
-      std::cerr << "WARNING: Invalid vertex index " << vi.v_idx << " in face" << std::endl;
+      std::cerr << "Warning: Invalid vertex index " << vi.v_idx << " in face" << std::endl;
     }
   }
 
   if (parsedIndices.size() < 3) {
-    std::cerr << "WARNING: Face with less than 3 vertices" << std::endl;
+    std::cerr << "Warning: Face with less than 3 vertices" << std::endl;
     return;
   }
 
+  // Triangulate the face (handles both triangles and quads)
   for (size_t i = 1; i < parsedIndices.size() - 1; ++i) {
     Triangle tri;
     tri.vertices[0] = parsedIndices[0];
@@ -163,12 +165,24 @@ static void parse_object(std::string &line) {
   // TODO: Implement object parsing
 }
 
+// Helper struct for Map lookups
+struct VertexIndexComparator {
+  bool operator()(const VertexIndex &a, const VertexIndex &b) const {
+    if (a.v_idx != b.v_idx)
+      return a.v_idx < b.v_idx;
+    if (a.vn_idx != b.vn_idx)
+      return a.vn_idx < b.vn_idx;
+    return a.vt_idx < b.vt_idx;
+  }
+};
+
 void FileParser::parse_OBJ(const char *filePath) {
   std::ifstream file_stream(filePath);
   if (!file_stream.is_open()) {
     throw std::runtime_error("Failed to open file stream, check file path");
   }
 
+  // Clear previous data
   FileParser::allTriangles.clear();
   temp_positions.clear();
   temp_normals.clear();
@@ -215,52 +229,56 @@ void FileParser::parse_OBJ(const char *filePath) {
     }
   }
 
+  // Clear previous data
   VulkanApplication::vertices.clear();
   VulkanApplication::indices.clear();
 
-  struct VertexIndexComparator {
-    bool operator()(const VertexIndex &a, const VertexIndex &b) const {
-      if (a.v_idx != b.v_idx)
-        return a.v_idx < b.v_idx;
-      if (a.vn_idx != b.vn_idx)
-        return a.vn_idx < b.vn_idx;
-      return a.vt_idx < b.vt_idx;
-    }
-  };
-
+  // Deduplication map
   std::map<VertexIndex, uint32_t, VertexIndexComparator> uniqueVertices;
 
   for (const auto &tri : FileParser::allTriangles) {
+    // 1. Calculate geometric normal for the face (fallback if no normals in file)
+    glm::vec3 p0 = temp_positions[tri.vertices[0].v_idx - 1];
+    glm::vec3 p1 = temp_positions[tri.vertices[1].v_idx - 1];
+    glm::vec3 p2 = temp_positions[tri.vertices[2].v_idx - 1];
+
+    glm::vec3 edge1 = p1 - p0;
+    glm::vec3 edge2 = p2 - p0;
+    glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
+
     for (int i = 0; i < 3; ++i) {
       VertexIndex vi = tri.vertices[i];
+      Vertex vertex{};
 
-      if (uniqueVertices.find(vi) == uniqueVertices.end()) {
-        Vertex vertex{};
+      // Position
+      vertex.pos = temp_positions[vi.v_idx - 1];
+      vertex.color = {1.0f, 1.0f, 1.0f};
 
-        int p_idx = vi.v_idx - 1;
-        if (p_idx >= 0 && p_idx < temp_positions.size()) {
-          vertex.pos = temp_positions[p_idx];
+      // Normal
+      if (vi.vn_idx > 0 && vi.vn_idx <= temp_normals.size()) {
+        vertex.normal = temp_normals[vi.vn_idx - 1];
+
+        // Use map for deduplication only if we have explicit normals (smooth shading)
+        if (uniqueVertices.count(vi) == 0) {
+          uniqueVertices[vi] = static_cast<uint32_t>(VulkanApplication::vertices.size());
+          VulkanApplication::vertices.push_back(vertex);
         }
+        VulkanApplication::indices.push_back(uniqueVertices[vi]);
 
-        int n_idx = vi.vn_idx - 1;
-        if (n_idx >= 0 && n_idx < temp_normals.size()) {
-          vertex.normal = temp_normals[n_idx];
-        } else {
-          vertex.normal = {0.0f, 1.0f, 0.0f};
-        }
+      } else {
+        // No normal in file, use calculated face normal (Flat shading)
+        vertex.normal = faceNormal;
 
-        vertex.color = {1.0f, 1.0f, 1.0f};
-        vertex.texCoord = {0.0f, 0.0f, 0.0f};
-
-        uniqueVertices[vi] = static_cast<uint32_t>(VulkanApplication::vertices.size());
+        // Cannot deduplicate effectively for flat shading without complex logic
+        // (vertices at same position need different normals for different faces).
+        VulkanApplication::indices.push_back(static_cast<uint32_t>(VulkanApplication::vertices.size()));
         VulkanApplication::vertices.push_back(vertex);
       }
-
-      VulkanApplication::indices.push_back(uniqueVertices[vi]);
     }
   }
 
-  std::cout << std::format("Final: {} vertices, {} indices loaded", VulkanApplication::vertices.size(), VulkanApplication::indices.size()) << std::endl;
+  std::cout << "Final: " << VulkanApplication::vertices.size() << " vertices, "
+            << VulkanApplication::indices.size() << " indices" << std::endl;
 
   auto app = VulkanApplication::getInstance();
 }
