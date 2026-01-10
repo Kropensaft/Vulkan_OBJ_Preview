@@ -108,7 +108,6 @@ static void parse_face(std::string &line) {
   std::string chunk;
   while (lineStream >> chunk) {
     VertexIndex vi = parseVertexChunk(chunk);
-    // Validate the vertex index exists
     if (vi.v_idx > 0 && vi.v_idx <= temp_positions.size()) {
       parsedIndices.push_back(vi);
     } else {
@@ -121,7 +120,6 @@ static void parse_face(std::string &line) {
     return;
   }
 
-  // Triangulate the face (handles both triangles and quads)
   for (size_t i = 1; i < parsedIndices.size() - 1; ++i) {
     Triangle tri;
     tri.vertices[0] = parsedIndices[0];
@@ -165,7 +163,6 @@ static void parse_object(std::string &line) {
   // TODO: Implement object parsing
 }
 
-// Helper struct for Map lookups
 struct VertexIndexComparator {
   bool operator()(const VertexIndex &a, const VertexIndex &b) const {
     if (a.v_idx != b.v_idx)
@@ -229,15 +226,12 @@ void FileParser::parse_OBJ(const char *filePath) {
     }
   }
 
-  // Clear previous data
   VulkanApplication::vertices.clear();
   VulkanApplication::indices.clear();
 
-  // Deduplication map
   std::map<VertexIndex, uint32_t, VertexIndexComparator> uniqueVertices;
 
   for (const auto &tri : FileParser::allTriangles) {
-    // 1. Calculate geometric normal for the face (fallback if no normals in file)
     glm::vec3 p0 = temp_positions[tri.vertices[0].v_idx - 1];
     glm::vec3 p1 = temp_positions[tri.vertices[1].v_idx - 1];
     glm::vec3 p2 = temp_positions[tri.vertices[2].v_idx - 1];
@@ -258,7 +252,6 @@ void FileParser::parse_OBJ(const char *filePath) {
       if (vi.vn_idx > 0 && vi.vn_idx <= temp_normals.size()) {
         vertex.normal = temp_normals[vi.vn_idx - 1];
 
-        // Use map for deduplication only if we have explicit normals (smooth shading)
         if (uniqueVertices.count(vi) == 0) {
           uniqueVertices[vi] = static_cast<uint32_t>(VulkanApplication::vertices.size());
           VulkanApplication::vertices.push_back(vertex);
@@ -266,11 +259,8 @@ void FileParser::parse_OBJ(const char *filePath) {
         VulkanApplication::indices.push_back(uniqueVertices[vi]);
 
       } else {
-        // No normal in file, use calculated face normal (Flat shading)
         vertex.normal = faceNormal;
 
-        // Cannot deduplicate effectively for flat shading without complex logic
-        // (vertices at same position need different normals for different faces).
         VulkanApplication::indices.push_back(static_cast<uint32_t>(VulkanApplication::vertices.size()));
         VulkanApplication::vertices.push_back(vertex);
       }
