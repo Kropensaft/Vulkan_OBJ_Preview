@@ -2,6 +2,7 @@
 #include "VulkanApplication.h"
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -107,20 +108,18 @@ static void parse_face(std::string &line) {
   std::string chunk;
   while (lineStream >> chunk) {
     VertexIndex vi = parseVertexChunk(chunk);
-    // Validate the vertex index exists
     if (vi.v_idx > 0 && vi.v_idx <= temp_positions.size()) {
       parsedIndices.push_back(vi);
     } else {
-      std::cerr << "Warning: Invalid vertex index " << vi.v_idx << " in face" << std::endl;
+      std::cerr << "WARNING: Invalid vertex index " << vi.v_idx << " in face" << std::endl;
     }
   }
 
   if (parsedIndices.size() < 3) {
-    std::cerr << "Warning: Face with less than 3 vertices" << std::endl;
+    std::cerr << "WARNING: Face with less than 3 vertices" << std::endl;
     return;
   }
 
-  // Triangulate the face (handles both triangles and quads)
   for (size_t i = 1; i < parsedIndices.size() - 1; ++i) {
     Triangle tri;
     tri.vertices[0] = parsedIndices[0];
@@ -170,9 +169,9 @@ void FileParser::parse_OBJ(const char *filePath) {
     throw std::runtime_error("Failed to open file stream, check file path");
   }
 
-  // Clear previous data
   FileParser::allTriangles.clear();
   temp_positions.clear();
+  temp_normals.clear();
   VulkanApplication::vertices.clear();
   VulkanApplication::indices.clear();
 
@@ -209,45 +208,59 @@ void FileParser::parse_OBJ(const char *filePath) {
       parse_object(line);
       break;
     case ObjLineType::COMMENT:
-      std::cout << std::format("Parsed comment {}", line);
+      break;
     case ObjLineType::UNKNOWN:
       std::cout << "Unknown line type encountered" << std::endl;
       break;
     }
   }
 
-  // Clear previous data
   VulkanApplication::vertices.clear();
   VulkanApplication::indices.clear();
 
-  for (size_t i = 0; i < temp_positions.size(); ++i) {
-    Vertex vertex;
-    vertex.pos = temp_positions[i];
-    vertex.color = {1.0f, 1.0f, 1.0f};
-
-    if (i < temp_normals.size()) {
-      vertex.normal = temp_normals[i];
-    } else {
-      vertex.normal = {0.0f, 1.0f, 0.0f};
+  struct VertexIndexComparator {
+    bool operator()(const VertexIndex &a, const VertexIndex &b) const {
+      if (a.v_idx != b.v_idx)
+        return a.v_idx < b.v_idx;
+      if (a.vn_idx != b.vn_idx)
+        return a.vn_idx < b.vn_idx;
+      return a.vt_idx < b.vt_idx;
     }
+  };
 
-    VulkanApplication::vertices.push_back(vertex);
-  }
+  std::map<VertexIndex, uint32_t, VertexIndexComparator> uniqueVertices;
 
   for (const auto &tri : FileParser::allTriangles) {
     for (int i = 0; i < 3; ++i) {
-      uint32_t vertexIndex = tri.vertices[i].v_idx - 1;
+      VertexIndex vi = tri.vertices[i];
 
-      if (vertexIndex < VulkanApplication::vertices.size()) {
-        VulkanApplication::indices.push_back(vertexIndex);
-      } else {
-        std::cerr << "Error: Invalid vertex index " << vertexIndex << std::endl;
+      if (uniqueVertices.find(vi) == uniqueVertices.end()) {
+        Vertex vertex{};
+
+        int p_idx = vi.v_idx - 1;
+        if (p_idx >= 0 && p_idx < temp_positions.size()) {
+          vertex.pos = temp_positions[p_idx];
+        }
+
+        int n_idx = vi.vn_idx - 1;
+        if (n_idx >= 0 && n_idx < temp_normals.size()) {
+          vertex.normal = temp_normals[n_idx];
+        } else {
+          vertex.normal = {0.0f, 1.0f, 0.0f};
+        }
+
+        vertex.color = {1.0f, 1.0f, 1.0f};
+        vertex.texCoord = {0.0f, 0.0f, 0.0f};
+
+        uniqueVertices[vi] = static_cast<uint32_t>(VulkanApplication::vertices.size());
+        VulkanApplication::vertices.push_back(vertex);
       }
+
+      VulkanApplication::indices.push_back(uniqueVertices[vi]);
     }
   }
 
-  std::cout << "Final: " << VulkanApplication::vertices.size() << " vertices, "
-            << VulkanApplication::indices.size() << " indices" << std::endl;
+  std::cout << std::format("Final: {} vertices, {} indices loaded", VulkanApplication::vertices.size(), VulkanApplication::indices.size()) << std::endl;
 
   auto app = VulkanApplication::getInstance();
 }

@@ -60,7 +60,6 @@ public:
   }
 
   static void parse_OBJ(const char *filepath);
-
   static std::vector<Triangle> allTriangles;
 
 private:
