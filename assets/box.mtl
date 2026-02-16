@@ -1,0 +1,10 @@
+# box.mtl - Material definitions for the test cube
+
+newmtl RedMat
+Kd 1.0 0.0 0.0
+
+newmtl GreenMat
+Kd 0.0 1.0 0.0
+
+newmtl BlueMat
+Kd 0.0 0.5 1.0

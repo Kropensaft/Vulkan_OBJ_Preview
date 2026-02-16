@@ -19,6 +19,9 @@ find_package(glfw3 3.3 REQUIRED)
 # List all source files from the src directory
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
+# Filter macOS binary files
+list(FILTER SOURCES EXCLUDE REGEX "/\\._")
+
 # Create the executable target
 add_executable(${PROJECT_NAME} ${SOURCES})
  

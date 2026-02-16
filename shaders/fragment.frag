@@ -4,6 +4,7 @@ layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec3 fragPos;
 layout(location = 3) in vec4 fragPosLightSpace; 
+layout(location = 4) in vec2 fragTexCoord;
 
 layout(set=0, binding = 2) uniform LightUbo {
     vec4 direction;
@@ -14,6 +15,7 @@ layout(set=0, binding = 2) uniform LightUbo {
 layout(set = 1, binding = 0) uniform sampler2D shadowMap; 
 
 layout(location = 0) out vec4 outColor;
+
 
 float calculateShadow(vec4 lightSpacePos, float bias) {
     vec3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
@@ -41,21 +43,21 @@ float calculateShadow(vec4 lightSpacePos, float bias) {
 
 void main() {
 
-    vec3 normal = normalize(fragNormal);
-    vec3 lightDir = normalize(-light.direction.xyz);
+    vec3 normal = normalize(fragNormal); 
+    vec3 lightDir = normalize(-light.direction.xyz); 
 
-    float bias = 0.0;
-
-    float shadowFactor = calculateShadow(fragPosLightSpace, bias);
+    float bias = 0.0; 
+    float shadowFactor = calculateShadow(fragPosLightSpace, bias); 
     
-    vec3 ambient = light.color.xyz * 0.1;
-    float diff = max(dot(normal, lightDir), 0.0);
-    vec3 diffuse = light.color.xyz * diff;
+    vec3 ambient = light.color.xyz * 0.1; 
+    float diff = max(dot(normal, lightDir), 0.0); 
+    vec3 diffuse = light.color.xyz * diff; 
     
-    float shadowIntensity = 0.5; 
-    diffuse = diffuse * (1.0 - shadowFactor * shadowIntensity);
-    vec3 finalColor = ambient + diffuse; 
+    float shadowIntensity = 0.5;  
+    diffuse = diffuse * (1.0 - shadowFactor * shadowIntensity); 
+    vec3 finalColor = ambient + diffuse;  
     
-    vec3 objectColor = vec3(0.4, 0.4, 0.4); // Dark Grey
-    outColor = vec4(finalColor * objectColor, 1.0);
+    vec3 objectColor = fragColor; 
+    
+    outColor = vec4(finalColor * objectColor, 1.0); 
 }

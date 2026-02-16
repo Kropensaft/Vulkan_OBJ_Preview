@@ -1,11 +1,17 @@
 #include "FileParser.h"
 #include "VulkanApplication.h"
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
+
+std::string FileParser::current_material = "";
+std::string FileParser::current_group = "";
+std::string FileParser::current_object = "";
 
 VkVertexInputBindingDescription Vertex::getBindingDescription() {
   VkVertexInputBindingDescription bindingDescription{};
@@ -15,7 +21,8 @@ VkVertexInputBindingDescription Vertex::getBindingDescription() {
   return bindingDescription;
 }
 
-std::array<VkVertexInputAttributeDescription, 4> Vertex::getAttributeDescriptions() {
+std::array<VkVertexInputAttributeDescription, 4>
+Vertex::getAttributeDescriptions() {
   std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
 
   // INFO: Position attribute
@@ -45,21 +52,25 @@ std::array<VkVertexInputAttributeDescription, 4> Vertex::getAttributeDescription
   return attributeDescriptions;
 }
 
-std::vector<Triangle> FileParser::allTriangles;
+std::map<std::string, std::vector<Triangle>> FileParser::groupedTriangles;
+std::vector<SubMesh> FileParser::subMeshes;
 
-const std::unordered_map<std::string_view, ObjLineType> FileParser::prefixMap = {
-    {"v", ObjLineType::VERTEX},
-    {"vt", ObjLineType::TEXTURE_COORDINATE},
-    {"vn", ObjLineType::VERTEX_NORMAL},
-    {"f", ObjLineType::FACE},
-    {"g", ObjLineType::GROUP},
-    {"o", ObjLineType::OBJECT},
-    {"#", ObjLineType::COMMENT},
-    {"mtllib", ObjLineType::MATERIAL_LIBRARY},
-    {"usemtl", ObjLineType::USE_MATERIAL}};
+const std::unordered_map<std::string_view, ObjLineType> FileParser::prefixMap =
+    {{"v", ObjLineType::VERTEX},
+     {"vt", ObjLineType::TEXTURE_COORDINATE},
+     {"vn", ObjLineType::VERTEX_NORMAL},
+     {"f", ObjLineType::FACE},
+     {"g", ObjLineType::GROUP},
+     {"o", ObjLineType::OBJECT},
+     {"#", ObjLineType::COMMENT},
+     {"mtllib", ObjLineType::MATERIAL_LIBRARY},
+     {"usemtl", ObjLineType::USE_MATERIAL}};
 
 static std::vector<glm::vec3> temp_positions;
 static std::vector<glm::vec3> temp_normals;
+static std::vector<glm::vec2> temp_texcoords;
+
+std::unordered_map<std::string, Material> FileParser::materials;
 
 static VertexIndex parseVertexChunk(const std::string &chunk) {
   VertexIndex result;
@@ -99,7 +110,7 @@ static void parse_vertex(std::string &line) {
   temp_positions.push_back(vert.pos);
 }
 
-static void parse_face(std::string &line) {
+void FileParser::parse_face(std::string &line) {
   std::istringstream lineStream(line);
   std::string prefix;
   lineStream >> prefix;
@@ -108,10 +119,13 @@ static void parse_face(std::string &line) {
   std::string chunk;
   while (lineStream >> chunk) {
     VertexIndex vi = parseVertexChunk(chunk);
+    vi.material_name = current_material;
+
     if (vi.v_idx > 0 && vi.v_idx <= temp_positions.size()) {
       parsedIndices.push_back(vi);
     } else {
-      std::cerr << "Warning: Invalid vertex index " << vi.v_idx << " in face" << std::endl;
+      std::cerr << "Warning: Invalid vertex index " << vi.v_idx << " in face"
+                << std::endl;
     }
   }
 
@@ -125,12 +139,22 @@ static void parse_face(std::string &line) {
     tri.vertices[0] = parsedIndices[0];
     tri.vertices[1] = parsedIndices[i];
     tri.vertices[2] = parsedIndices[i + 1];
-    FileParser::allTriangles.push_back(tri);
+
+    FileParser::groupedTriangles[current_object].push_back(tri);
   }
 }
 
 static void parse_texture_coord(std::string &line) {
-  // TODO: Implement texture coordinate parsing
+  glm::vec2 texCoord(0.0f);
+  std::istringstream iss(line);
+  std::string prefix;
+
+  iss >> prefix;
+
+  if (!(iss >> texCoord.x >> texCoord.y)) {
+    // TODO: do stuff
+  }
+  temp_texcoords.push_back(texCoord);
 }
 
 static void parse_normal(std::string &line) {
@@ -147,31 +171,105 @@ static void parse_normal(std::string &line) {
   temp_normals.push_back(normal);
 }
 
-static void load_material_library(std::string &line) {
-  // TODO: Implement material library loading
+void FileParser::load_material_library(std::string &line,
+                                       const std::string &base_dir) {
+  std::istringstream iss(line);
+  std::string token, filename;
+
+  iss >> token >> filename;
+
+  if (filename.empty()) {
+    return;
+  }
+
+  std::string full_path = base_dir + '/' + filename;
+  std::ifstream file(full_path);
+
+  if (!file.is_open()) {
+    throw std::runtime_error(
+        std::format("File at {} coult not be opened", full_path));
+  }
+
+  std::string mtl_line;
+  Material current_mtl;
+  bool parsing_material = false;
+
+  while (std::getline(file, mtl_line)) {
+    std::istringstream mtl_iss(mtl_line);
+    std::string type;
+
+    mtl_iss >> type;
+
+    // INFO: If were already parsing a material, save it before going to the
+    // next one
+    if (type == "newmtl") {
+      if (parsing_material) {
+        materials[current_mtl.name] = current_mtl;
+      }
+
+      current_mtl = Material();
+      mtl_iss >> current_mtl.name;
+      parsing_material = true;
+    } else if (type == "Kd") {
+      // Diffuse color (RGB)
+      mtl_iss >> current_mtl.diffuse[0] >> current_mtl.diffuse[1] >>
+          current_mtl.diffuse[2];
+    } else if (type == "Ka") {
+      // Ambient color (RGB)
+      mtl_iss >> current_mtl.ambient[0] >> current_mtl.ambient[1] >>
+          current_mtl.ambient[2];
+    } else if (type == "Ks") {
+      // Specular color (RGB)
+      mtl_iss >> current_mtl.specular[0] >> current_mtl.specular[1] >>
+          current_mtl.specular[2];
+    } else if (type == "Ns") {
+      // Shininess
+      mtl_iss >> current_mtl.shininess;
+    } else if (type == "map_Kd") {
+      // Diffuse texture map filename
+      mtl_iss >> current_mtl.diffuse_map;
+    }
+  }
+
+  if (parsing_material) {
+    materials[current_mtl.name] = current_mtl;
+  }
+
+  std::cout << "Succesfully loaded " << materials.size() << " materials from "
+            << filename << std::endl;
 }
 
-static void set_current_material(std::string &line) {
-  // TODO: Implement material setting
+void FileParser::set_current_material(std::string &line) {
+  std::istringstream iss(line);
+  std::string token, material_name;
+
+  iss >> token >> material_name;
+
+  if (!material_name.empty()) {
+    if (materials.find(material_name) != materials.end()) {
+      current_material = material_name;
+    } else {
+      throw std::runtime_error(
+          std::format("Warning: OBJ requested material ', but it was not found "
+                      "in the MTL file.\n",
+                      material_name));
+      current_material = "default";
+    }
+  }
 }
 
 static void parse_group(std::string &line) {
   // TODO: Implement group parsing
 }
 
-static void parse_object(std::string &line) {
-  // TODO: Implement object parsing
-}
+void FileParser::parse_object(std::string &line) {
+  std::istringstream iss(line);
+  std::string object_name, token;
 
-struct VertexIndexComparator {
-  bool operator()(const VertexIndex &a, const VertexIndex &b) const {
-    if (a.v_idx != b.v_idx)
-      return a.v_idx < b.v_idx;
-    if (a.vn_idx != b.vn_idx)
-      return a.vn_idx < b.vn_idx;
-    return a.vt_idx < b.vt_idx;
-  }
-};
+  iss >> token >> object_name;
+
+  current_object = object_name.empty() ? "default" : object_name;
+}
 
 void FileParser::parse_OBJ(const char *filePath) {
   std::ifstream file_stream(filePath);
@@ -179,10 +277,14 @@ void FileParser::parse_OBJ(const char *filePath) {
     throw std::runtime_error("Failed to open file stream, check file path");
   }
 
+  std::string base_dir = std::filesystem::path(filePath).parent_path().string();
+
   // Clear previous data
-  FileParser::allTriangles.clear();
+  FileParser::groupedTriangles.clear();
+  FileParser::subMeshes.clear();
   temp_positions.clear();
   temp_normals.clear();
+  temp_texcoords.clear();
   VulkanApplication::vertices.clear();
   VulkanApplication::indices.clear();
 
@@ -207,7 +309,7 @@ void FileParser::parse_OBJ(const char *filePath) {
       parse_normal(line);
       break;
     case ObjLineType::MATERIAL_LIBRARY:
-      load_material_library(line);
+      load_material_library(line, base_dir);
       break;
     case ObjLineType::USE_MATERIAL:
       set_current_material(line);
@@ -231,44 +333,71 @@ void FileParser::parse_OBJ(const char *filePath) {
 
   std::map<VertexIndex, uint32_t, VertexIndexComparator> uniqueVertices;
 
-  for (const auto &tri : FileParser::allTriangles) {
-    glm::vec3 p0 = temp_positions[tri.vertices[0].v_idx - 1];
-    glm::vec3 p1 = temp_positions[tri.vertices[1].v_idx - 1];
-    glm::vec3 p2 = temp_positions[tri.vertices[2].v_idx - 1];
+  for (const auto &[objectName, triangles] : FileParser::groupedTriangles) {
 
-    glm::vec3 edge1 = p1 - p0;
-    glm::vec3 edge2 = p2 - p0;
-    glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
+    SubMesh currentSubMesh;
+    currentSubMesh.name = objectName;
+    // INFO: Record where this object begins in the master index buffer
+    currentSubMesh.first_idx =
+        static_cast<uint32_t>(VulkanApplication::indices.size());
 
-    for (int i = 0; i < 3; ++i) {
-      VertexIndex vi = tri.vertices[i];
-      Vertex vertex{};
+    for (const auto &tri : triangles) {
+      glm::vec3 p0 = temp_positions[tri.vertices[0].v_idx - 1];
+      glm::vec3 p1 = temp_positions[tri.vertices[1].v_idx - 1];
+      glm::vec3 p2 = temp_positions[tri.vertices[2].v_idx - 1];
 
-      // Position
-      vertex.pos = temp_positions[vi.v_idx - 1];
-      vertex.color = {1.0f, 1.0f, 1.0f};
+      glm::vec3 edge1 = p1 - p0;
+      glm::vec3 edge2 = p2 - p0;
+      glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
 
-      // Normal
-      if (vi.vn_idx > 0 && vi.vn_idx <= temp_normals.size()) {
-        vertex.normal = temp_normals[vi.vn_idx - 1];
+      glm::vec3 faceColor = {1.0f, 1.0f, 1.0f};
+      std::string mat_name = tri.vertices[0].material_name;
+      if (materials.find(mat_name) != materials.end()) {
+        const Material &mat = materials[mat_name];
+        faceColor = glm::vec3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
+      }
 
-        if (uniqueVertices.count(vi) == 0) {
-          uniqueVertices[vi] = static_cast<uint32_t>(VulkanApplication::vertices.size());
+      for (int i = 0; i < 3; ++i) {
+        VertexIndex vi = tri.vertices[i];
+        Vertex vertex{};
+
+        vertex.pos = temp_positions[vi.v_idx - 1];
+        vertex.color = faceColor;
+
+        if (vi.vn_idx > 0 && vi.vn_idx <= temp_normals.size()) {
+          vertex.normal = temp_normals[vi.vn_idx - 1];
+
+          if (uniqueVertices.count(vi) == 0) {
+            uniqueVertices[vi] =
+                static_cast<uint32_t>(VulkanApplication::vertices.size());
+            VulkanApplication::vertices.push_back(vertex);
+          }
+          VulkanApplication::indices.push_back(uniqueVertices[vi]);
+        } else {
+          vertex.normal = faceNormal;
+          VulkanApplication::indices.push_back(
+              static_cast<uint32_t>(VulkanApplication::vertices.size()));
           VulkanApplication::vertices.push_back(vertex);
         }
-        VulkanApplication::indices.push_back(uniqueVertices[vi]);
-
-      } else {
-        vertex.normal = faceNormal;
-
-        VulkanApplication::indices.push_back(static_cast<uint32_t>(VulkanApplication::vertices.size()));
-        VulkanApplication::vertices.push_back(vertex);
       }
     }
+
+    currentSubMesh.idx_count =
+        static_cast<uint32_t>(VulkanApplication::indices.size()) -
+        currentSubMesh.first_idx;
+
+    FileParser::subMeshes.push_back(currentSubMesh);
+
+    std::cout << "Parsed SubMesh: " << currentSubMesh.name
+              << " (Indices: " << currentSubMesh.idx_count << ")\n";
   }
 
   std::cout << "Final: " << VulkanApplication::vertices.size() << " vertices, "
             << VulkanApplication::indices.size() << " indices" << std::endl;
+
+  std::cout << std::format("Final count: {} vertices, {} indices",
+                           VulkanApplication::vertices.size(),
+                           VulkanApplication::indices.size());
 
   auto app = VulkanApplication::getInstance();
 }

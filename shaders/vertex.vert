@@ -10,6 +10,8 @@ layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec3 fragPos;          
 layout(location = 3) out vec4 fragPosLightSpace; 
 
+layout(location = 4) out vec2 fragTexCoord;
+
 layout(set=0, binding = 0) uniform CameraUBO {
     mat4 view;
     mat4 proj;
@@ -34,4 +36,6 @@ void main() {
     fragNormal = mat3(normal_ubo.normal) * inNormal; 
     fragPos = worldPos.xyz; 
     fragPosLightSpace = light.lightSpaceMatrix * worldPos; 
+
+    fragTexCoord = inTexCoord;
 }

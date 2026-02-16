@@ -1,5 +1,5 @@
-#include "VulkanApplication.h"
 #include "Window.h"
+#include "VulkanApplication.h"
 #include <stdexcept>
 
 #if defined(__APPLE__)
@@ -22,21 +22,16 @@ void loadModelFromFile(const char *filepath) {
   VulkanApplication::getInstance()->recreateGeometryBuffers();
 }
 
-void renderWireframe(void) {
-  VulkanApplication::toggleWireframe();
-}
+void renderWireframe(void) { VulkanApplication::toggleWireframe(); }
 
-void Window::zoomIn(void) {
-  VulkanApplication::zoomIn();
-}
+void Window::zoomIn(void) { VulkanApplication::zoomIn(); }
 
-void Window::zoomOut(void) {
-  VulkanApplication::zoomOut();
-}
+void Window::zoomOut(void) { VulkanApplication::zoomOut(); }
 
 Window *Window::instance = nullptr;
 
-Window::Window(int w, int h, std::string name) : width(w), height(h), windowName(name) {
+Window::Window(int w, int h, std::string name)
+    : width(w), height(h), windowName(name) {
   instance = this;
   initWindow();
   setupInputCallbacks();
@@ -52,38 +47,41 @@ void Window::initWindow() {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-  window = glfwCreateWindow(width, height, windowName.c_str(), nullptr, nullptr);
+  window =
+      glfwCreateWindow(width, height, windowName.c_str(), nullptr, nullptr);
 
 #if defined(__APPLE__)
   void *native_window_handle = glfwGetCocoaWindow(window);
-  create_macos_menu_bar(native_window_handle, &loadModelFromFile, &renderWireframe, &Window::zoomIn, &Window::zoomOut);
+  create_macos_menu_bar(native_window_handle, &loadModelFromFile,
+                        &renderWireframe, &Window::zoomIn, &Window::zoomOut);
 #endif
 }
 
-GLFWwindow *Window::getGLFWWindow() {
-  return instance->window;
-}
+GLFWwindow *Window::getGLFWWindow() { return instance->window; }
 
 void Window::setupInputCallbacks() {
   glfwSetCursorPosCallback(window, mousePositionCallback);
   glfwSetMouseButtonCallback(window, mouseButtonCallback);
 }
 
-void Window::mousePositionCallback(GLFWwindow *window, double xpos, double ypos) {
+void Window::mousePositionCallback(GLFWwindow *window, double xpos,
+                                   double ypos) {
   if (instance) {
     instance->mousePos.x = xpos;
     instance->mousePos.y = ypos;
   }
 }
 
-void Window::mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
+void Window::mouseButtonCallback(GLFWwindow *window, int button, int action,
+                                 int mods) {
   if (instance && button >= 0 && button < GLFW_MOUSE_BUTTON_LAST) {
     instance->mouseButtons[button] = (action == GLFW_PRESS);
   }
 }
 
 void Window::createWindowSurface(VkInstance instance, VkSurfaceKHR *surface) {
-  if ((glfwCreateWindowSurface(instance, window, nullptr, surface) != VK_SUCCESS)) {
+  if ((glfwCreateWindowSurface(instance, window, nullptr, surface) !=
+       VK_SUCCESS)) {
     throw std::runtime_error("Failed to create window surface!");
   }
 }
