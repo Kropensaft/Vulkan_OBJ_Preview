@@ -1,0 +1,3 @@
+/Volumes/T7 Shield/Vulkan/Vulkan_OBJ_Preview/build/CMakeFiles/VulkanApp.dir
+/Volumes/T7 Shield/Vulkan/Vulkan_OBJ_Preview/build/CMakeFiles/edit_cache.dir
+/Volumes/T7 Shield/Vulkan/Vulkan_OBJ_Preview/build/CMakeFiles/rebuild_cache.dir
