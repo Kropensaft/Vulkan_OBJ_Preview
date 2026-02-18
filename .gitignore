@@ -82,3 +82,17 @@ compile_commands.json
 *.dylib
 *.so
 *.a
+
+# Ignore CMake build directories
+/build/
+/cmake-build-debug/
+/cmake-build-release/
+
+# Ignore FetchContent downloads
+/_deps/
+
+# Ignore generated Makefiles and Cache
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake

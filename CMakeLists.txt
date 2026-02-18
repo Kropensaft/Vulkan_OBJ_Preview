@@ -1,9 +1,21 @@
 # Minimum required version of CMake
 cmake_minimum_required(VERSION 3.12)
-
 # Project name and language
 project(VulkanApp CXX)
 add_compile_definitions(GLM_FORCE_DEPTH_ZERO_TO_ONE)
+
+include(FetchContent)
+
+# Automatically fetch GLM
+FetchContent_Declare(glm URL https://github.com/g-truc/glm/releases/download/0.9.9.8/glm-0.9.9.8.zip)
+FetchContent_MakeAvailable(glm)
+
+# Automatically fetch GLFW
+FetchContent_Declare(glfw GIT_REPOSITORY https://github.com/glfw/glfw.git GIT_TAG 3.3.8)
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(glfw)
+
 
 # Always generate the compile_commands.json file for the language server (clangd)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
