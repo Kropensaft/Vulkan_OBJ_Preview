@@ -10,6 +10,10 @@
 #include <GLFW/glfw3native.h>
 #include <iostream>
 
+#elif defined(__WIN32)
+#include "platforms/windows/menu_win.hpp"
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
 #endif
 
 void loadModelFromFile(const char *filepath) {
@@ -62,6 +66,11 @@ void Window::initWindow() {
   create_macos_menu_bar(native_window_handle, &loadModelFromFile,
                         &renderWireframe, &Window::zoomIn, &Window::zoomOut,
                         &Window::switchLS, &Window::setZoom);
+#elif defined(_WIN32)
+  void *native_window_handle = (void *)glfwGetWin32Window(window);
+  create_windows_menu_bar(native_window_handle, &loadModelFromFile,
+                          &renderWireframe, &Window::zoomIn, &Window::zoomOut,
+                          &Window::switchLS, &Window::setZoom);
 #endif
 }
 

@@ -95,4 +95,22 @@ if(APPLE)
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/../Resources/shaders"
         COMMENT "Copying shaders into app bundle"
     )
+elseif(WIN32)
+    target_sources(${PROJECT_NAME} PRIVATE src/platforms/windows/menu_win.cpp)
+
+    target_link_libraries(${PROJECT_NAME} PRIVATE User32 Comdlg32)
+
+    set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+
+    add_custom_command(
+        TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${PROJECT_SOURCE_DIR}/shaders"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders"
+        COMMENT "Copying shaders to the Windows executable directory"
+    )
+
 endif()
+
+
+	
