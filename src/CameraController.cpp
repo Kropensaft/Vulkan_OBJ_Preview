@@ -4,7 +4,8 @@
 #include <iostream>
 
 Camera::Camera(glm::vec3 &&eye, glm::vec3 &&lookat, glm::vec3 &&upVector)
-    : m_eye(std::move(eye)), m_lookAt(std::move(lookat)), m_upVector(std::move(upVector)) {
+    : m_eye(std::move(eye)), m_lookAt(std::move(lookat)),
+      m_upVector(std::move(upVector)) {
   UpdateViewMatrix();
 }
 
@@ -16,9 +17,10 @@ void Camera::SetCameraView(glm::vec3 eye, glm::vec3 lookat, glm::vec3 up) {
 }
 
 void Camera::CameraInit() {
-  glm::vec3 eye(0.332f, 8.689f, -10.857f); // High up and far forward on the Z-axis
-  glm::vec3 lookat(0.0f, 0.0f, 0.0f);      // Keep looking at the origin
-  glm::vec3 up(0.0f, 1.0f, 0.0f);          // Keep Y as the up direction
+  glm::vec3 eye(0.332f, 8.689f,
+                -10.857f);            // High up and far forward on the Z-axis
+  glm::vec3 lookat(0.0f, 0.0f, 0.0f); // Keep looking at the origin
+  glm::vec3 up(0.0f, 1.0f, 0.0f);     // Keep Y as the up direction
   SetCameraView(eye, lookat, up);
   // Initialize mouse tracking variables
   lastMouseX = 0.0f;
@@ -31,11 +33,13 @@ void Camera::UpdateViewMatrix() {
 }
 
 glm::vec3 Camera::zoomIn(float deltaTime) {
-  return m_eye += GetViewDir() * ZOOM_SPEED * deltaTime;
+  return m_eye +=
+         GetViewDir() * static_cast<float>(zoom_sensitivity) * deltaTime;
 }
 
 glm::vec3 Camera::zoomOut(float deltaTime) {
-  return m_eye -= GetViewDir() * ZOOM_SPEED * deltaTime;
+  return m_eye -=
+         GetViewDir() * static_cast<float>(zoom_sensitivity) * deltaTime;
 }
 void Camera::handleScroll(double yoffset) {
   float deltaTime = VulkanApplication::getDeltaTime();
@@ -48,14 +52,16 @@ void Camera::handleScroll(double yoffset) {
 
   UpdateViewMatrix();
 }
-void Camera::scrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
+void Camera::scrollCallback(GLFWwindow *window, double xoffset,
+                            double yoffset) {
   Camera *camera = static_cast<Camera *>(glfwGetWindowUserPointer(window));
   if (camera) {
     camera->handleScroll(yoffset);
   }
 }
 
-void Camera::UpdateCamera(GLFWwindow *window, float xoffset, float yoffset, float deltaTime) {
+void Camera::UpdateCamera(GLFWwindow *window, float xoffset, float yoffset,
+                          float deltaTime) {
   float sensitivity = 0.5f;
   float xAngle = xoffset * sensitivity * deltaTime;
   float yAngle = yoffset * sensitivity * deltaTime;
@@ -71,15 +77,14 @@ void Camera::UpdateCamera(GLFWwindow *window, float xoffset, float yoffset, floa
   glm::mat4 rotationMatrixX = glm::rotate(glm::mat4(1.0f), xAngle, m_upVector);
   position = (rotationMatrixX * (position - pivot)) + pivot;
 
-  glm::mat4 rotationMatrixY = glm::rotate(glm::mat4(1.0f), yAngle, GetRightVector());
+  glm::mat4 rotationMatrixY =
+      glm::rotate(glm::mat4(1.0f), yAngle, GetRightVector());
   m_eye = (rotationMatrixY * (position - pivot)) + pivot;
 
   UpdateViewMatrix();
 }
 
-glm::mat4x4 Camera::GetViewMatrix() const {
-  return m_viewMatrix;
-}
+glm::mat4x4 Camera::GetViewMatrix() const { return m_viewMatrix; }
 
 glm::vec3 Camera::GetEye() const { return m_eye; }
 glm::vec3 Camera::GetUpVector() const { return m_upVector; }

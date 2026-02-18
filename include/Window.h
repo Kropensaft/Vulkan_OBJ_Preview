@@ -16,20 +16,18 @@ public:
   Window &operator=(const Window &) = delete;
 
   static GLFWwindow *getGLFWWindow();
-  bool shouldClose() const {
-    return glfwWindowShouldClose(window);
-  }
+  bool shouldClose() const { return glfwWindowShouldClose(window); }
   void createWindowSurface(VkInstance instance, VkSurfaceKHR *surface);
 
   VkExtent2D getExtent() const {
     return {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
   }
-  glm::dvec2 getMousePosition() const {
-    return mousePos;
-  }
+  glm::dvec2 getMousePosition() const { return mousePos; }
 
   bool isMouseButtonPressed(int button) const {
-    return (button >= 0 && button < GLFW_MOUSE_BUTTON_LAST) ? mouseButtons[button] : false;
+    return (button >= 0 && button < GLFW_MOUSE_BUTTON_LAST)
+               ? mouseButtons[button]
+               : false;
   }
 
 private:
@@ -44,9 +42,13 @@ private:
 
   static void zoomIn(void);
   static void zoomOut(void);
+  static void switchLS(void);
+  static void setZoom(double);
 
-  static void mousePositionCallback(GLFWwindow *window, double xpos, double ypos);
-  static void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods);
+  static void mousePositionCallback(GLFWwindow *window, double xpos,
+                                    double ypos);
+  static void mouseButtonCallback(GLFWwindow *window, int button, int action,
+                                  int mods);
   GLFWwindow *window;
   static Window *instance;
 };

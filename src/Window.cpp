@@ -1,4 +1,5 @@
 #include "Window.h"
+#include "CameraController.h"
 #include "VulkanApplication.h"
 #include <stdexcept>
 
@@ -28,6 +29,12 @@ void Window::zoomIn(void) { VulkanApplication::zoomIn(); }
 
 void Window::zoomOut(void) { VulkanApplication::zoomOut(); }
 
+void Window::switchLS(void) { VulkanApplication::switchLightSourcePosition(); }
+
+void Window::setZoom(double sensitivity) {
+  VulkanApplication::setZoomSpeed(sensitivity);
+}
+
 Window *Window::instance = nullptr;
 
 Window::Window(int w, int h, std::string name)
@@ -53,7 +60,8 @@ void Window::initWindow() {
 #if defined(__APPLE__)
   void *native_window_handle = glfwGetCocoaWindow(window);
   create_macos_menu_bar(native_window_handle, &loadModelFromFile,
-                        &renderWireframe, &Window::zoomIn, &Window::zoomOut);
+                        &renderWireframe, &Window::zoomIn, &Window::zoomOut,
+                        &Window::switchLS, &Window::setZoom);
 #endif
 }
 

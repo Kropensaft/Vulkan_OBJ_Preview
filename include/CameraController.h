@@ -7,8 +7,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan_core.h>
 
-constexpr float ZOOM_SPEED = 10.f;
-
 class Camera {
 public:
   Camera() = default;
@@ -33,7 +31,12 @@ public:
   glm::vec3 zoomOut(float deltaTime);
   glm::vec3 zoomIn(float deltaTime);
 
+  inline void set_zoom_sensitivity(double);
+  inline double get_zoom_sensitivity() const;
+
 private:
+  double zoom_sensitivity = 10.0;
+
   float xPos;
   float yPos;
   float yDeltaAngle;
@@ -47,5 +50,10 @@ private:
   glm::vec3 m_lookAt;   // Point that the camera is looking at
   glm::vec3 m_upVector; // Orientation of the camera
 };
+
+void Camera::set_zoom_sensitivity(double new_sens) {
+  zoom_sensitivity = new_sens;
+}
+double Camera::get_zoom_sensitivity() const { return zoom_sensitivity; }
 
 #endif // CAMERA_CONTROLLER_H

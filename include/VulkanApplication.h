@@ -35,13 +35,13 @@ public:
   VulkanApplication(const VulkanApplication &) = delete;
   VulkanApplication &operator=(const VulkanApplication &) = delete;
 
-  static VulkanApplication *getInstance() {
-    return appInstance;
-  }
+  static VulkanApplication *getInstance() { return appInstance; }
 
   static void toggleWireframe();
   static void zoomIn();
   static void zoomOut();
+  static void switchLightSourcePosition();
+  static void setZoomSpeed(double);
 
   VkDevice getDevice() { return device; }
   VkPhysicalDevice getPhysicalDevice() { return physicalDevice; }
@@ -62,6 +62,8 @@ private:
   void instanceToggleWireframe();
   void instanceZoomIn();
   void instanceZoomOut();
+  void instanceSetZoomSpeed(double);
+  void instanceSwitchLS();
   void cleanupGeometryBuffers();
 
   void initVulkan();
@@ -80,6 +82,12 @@ private:
   void createSyncObjects();
   void createVertexBuffer();
   void createIndexBuffer();
+
+  void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+                    VkMemoryPropertyFlags properties, VkBuffer &buffer,
+                    VkDeviceMemory &bufferMemory);
+  void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+
   void createCameraUniformBuffer();
   void createDescriptorPool();
   void createDescriptorSets();
@@ -92,9 +100,12 @@ private:
   void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
   void createDepthResources();
   VkFormat findDepthFormat();
-  VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+  VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates,
+                               VkImageTiling tiling,
+                               VkFormatFeatureFlags features);
   bool hasStencilComponent(VkFormat format);
-  uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+  uint32_t findMemoryType(uint32_t typeFilter,
+                          VkMemoryPropertyFlags properties);
   VkShaderModule createShaderModule(const std::vector<char> &code);
   const VkViewport &getViewPortRef();
 

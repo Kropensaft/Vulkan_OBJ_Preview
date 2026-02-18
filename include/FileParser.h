@@ -83,7 +83,7 @@ class FileParser {
 public:
   static void read_OBJ();
   static ObjLineType getLineType(std::string_view line) {
-    if (line.empty() || line[0] == '#')
+    if (line.empty())
       return ObjLineType::UNKNOWN;
 
     auto spacePos = line.find(' ');
@@ -104,6 +104,7 @@ public:
                                     const std::string &base_dir);
   static void set_current_material(std::string &line);
   static void parse_object(std::string &line);
+  static void parse_group(std::string &line);
 
 private:
   static std::string current_material;

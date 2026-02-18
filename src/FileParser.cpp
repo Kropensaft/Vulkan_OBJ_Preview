@@ -140,6 +140,11 @@ void FileParser::parse_face(std::string &line) {
     tri.vertices[1] = parsedIndices[i];
     tri.vertices[2] = parsedIndices[i + 1];
 
+    std::string active_mesh_name =
+        current_group.empty()
+            ? (current_object.empty() ? "default" : current_object)
+            : current_group;
+
     FileParser::groupedTriangles[current_object].push_back(tri);
   }
 }
@@ -152,7 +157,7 @@ static void parse_texture_coord(std::string &line) {
   iss >> prefix;
 
   if (!(iss >> texCoord.x >> texCoord.y)) {
-    // TODO: do stuff
+    std::cout << "Third tex-coordinate acquired but not parsed" << std::endl;
   }
   temp_texcoords.push_back(texCoord);
 }
@@ -258,8 +263,13 @@ void FileParser::set_current_material(std::string &line) {
   }
 }
 
-static void parse_group(std::string &line) {
-  // TODO: Implement group parsing
+void FileParser::parse_group(std::string &line) {
+  std::istringstream iss(line);
+  std::string token, group_name;
+
+  iss >> token >> group_name;
+
+  FileParser::current_group = group_name.empty() ? "default" : group_name;
 }
 
 void FileParser::parse_object(std::string &line) {
@@ -288,12 +298,23 @@ void FileParser::parse_OBJ(const char *filePath) {
   VulkanApplication::vertices.clear();
   VulkanApplication::indices.clear();
 
+  current_group = "";
+  current_object = "";
+
   std::string line;
   while (std::getline(file_stream, line)) {
-    if (line.empty())
-      continue;
+    size_t start = line.find_first_not_of(" \t\r\n");
 
-    ObjLineType line_type = FileParser::getLineType(line);
+    if (start == std::string::npos) {
+      continue;
+    }
+
+    if (line[start] == '#') {
+      continue;
+    }
+
+    std::string clean_line = line.substr(start);
+    ObjLineType line_type = FileParser::getLineType(clean_line);
 
     switch (line_type) {
     case ObjLineType::VERTEX:
@@ -321,9 +342,9 @@ void FileParser::parse_OBJ(const char *filePath) {
       parse_object(line);
       break;
     case ObjLineType::COMMENT:
-      break;
+      std::cout << std::format("Comment {}", clean_line) << std::endl;
     case ObjLineType::UNKNOWN:
-      std::cout << "Unknown line type encountered" << std::endl;
+      std::cout << "Unknown line type encountered : " << line[0] << std::endl;
       break;
     }
   }

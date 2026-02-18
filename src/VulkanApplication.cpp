@@ -54,6 +54,18 @@ void VulkanApplication::zoomOut() {
   }
 }
 
+void VulkanApplication::setZoomSpeed(double speed) {
+  if (appInstance) {
+    appInstance->instanceSetZoomSpeed(speed);
+  }
+}
+
+void VulkanApplication::switchLightSourcePosition() {
+  if (appInstance) {
+    appInstance->instanceSwitchLS();
+  }
+}
+
 void VulkanApplication::instanceLoadNewModel(const char *filePath) {
   std::cout << "Loading new model: " << filePath << std::endl;
   try {
@@ -70,10 +82,20 @@ void VulkanApplication::instanceLoadNewModel(const char *filePath) {
   }
 }
 
+void VulkanApplication::instanceSwitchLS() {
+  // TODO: Switch LS direction to camera view
+  glm::vec3 camera_view_direction = camera.GetViewDir();
+  light->setDirection(camera_view_direction);
+}
+
 void VulkanApplication::instanceToggleWireframe() {
   renderWireframe = !renderWireframe;
   std::cout << "Wireframe mode: " << (renderWireframe ? "ON" : "OFF")
             << std::endl;
+}
+
+void VulkanApplication::instanceSetZoomSpeed(double speed) {
+  camera.set_zoom_sensitivity(speed);
 }
 
 void VulkanApplication::instanceZoomIn() {
@@ -331,14 +353,25 @@ void VulkanApplication::createInstance() {
   createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   createInfo.ppEnabledExtensionNames = extensions.data();
 
-  // INFO: DISABLE VALIDATION LAYERS WITH THIS
-  // const std::vector<const char *> validationLayers = {};
+#ifdef NDEBUG
+  const bool enableValidationLayers = false;
+#else
+  const bool enableValidationLayers = true;
+#endif
 
   const std::vector<const char *> validationLayers = {
       "VK_LAYER_KHRONOS_validation"};
 
-  createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-  createInfo.ppEnabledLayerNames = validationLayers.data();
+  if (enableValidationLayers) {
+    std::cout << "Vulkan Validation Layers: ENABLED" << std::endl;
+    createInfo.enabledLayerCount =
+        static_cast<uint32_t>(validationLayers.size());
+    createInfo.ppEnabledLayerNames = validationLayers.data();
+  } else {
+    std::cout << "Vulkan Validation Layers: DISABLED (Fast Mode)" << std::endl;
+    createInfo.enabledLayerCount = 0;
+    createInfo.ppEnabledLayerNames = nullptr;
+  }
 
   if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
     throw std::runtime_error("failed to create instance!");
@@ -416,6 +449,26 @@ void VulkanApplication::createSwapChain() {
   swapChainExtent = window->getExtent();
   swapChainImageFormat = VK_FORMAT_B8G8R8A8_SRGB;
 
+  uint32_t presentModeCount;
+  vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface,
+                                            &presentModeCount, nullptr);
+  std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+  vkGetPhysicalDeviceSurfacePresentModesKHR(
+      physicalDevice, surface, &presentModeCount, presentModes.data());
+
+  VkPresentModeKHR bestPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+
+  for (const auto &availablePresentMode : presentModes) {
+    if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+      bestPresentMode = availablePresentMode;
+      break;
+    } else if (availablePresentMode == VK_PRESENT_MODE_FIFO_RELAXED_KHR) {
+      bestPresentMode = availablePresentMode;
+    }
+  }
+
+  std::cout << "Selected Present Mode: " << bestPresentMode << std::endl;
+
   VkSwapchainCreateInfoKHR createInfo{};
   createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   createInfo.surface = surface;
@@ -428,7 +481,7 @@ void VulkanApplication::createSwapChain() {
   createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   createInfo.preTransform = capabilities.currentTransform;
   createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  createInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  createInfo.presentMode = bestPresentMode;
   createInfo.clipped = VK_TRUE;
   createInfo.oldSwapchain = VK_NULL_HANDLE;
 
@@ -832,37 +885,30 @@ void VulkanApplication::createVertexBuffer() {
     return;
   }
 
-  VkBufferCreateInfo bufferInfo{};
-  bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  bufferInfo.size = sizeof(vertices[0]) * vertices.size();
-  bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
-  if (vkCreateBuffer(device, &bufferInfo, nullptr, &vertexBuffer) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Faied to create vertex buffer");
-  }
+  VkBuffer stagingBuffer;
+  VkDeviceMemory stagingBufferMemory;
 
-  VkMemoryRequirements memRequirements;
-  vkGetBufferMemoryRequirements(device, vertexBuffer, &memRequirements);
+  createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+               stagingBuffer, stagingBufferMemory);
 
-  VkMemoryAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = memRequirements.size;
-  allocInfo.memoryTypeIndex = findMemoryType(
-      memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-  if (vkAllocateMemory(device, &allocInfo, nullptr, &vertexBufferMemory) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("failed to allocate vertex buffer memory!");
-  }
-
-  vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
   void *data;
-  vkMapMemory(device, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
-  memcpy(data, vertices.data(), (size_t)bufferInfo.size);
-  vkUnmapMemory(device, vertexBufferMemory);
+  vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+  memcpy(data, vertices.data(), (size_t)bufferSize);
+  vkUnmapMemory(device, stagingBufferMemory);
+
+  createBuffer(
+      bufferSize,
+      VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+
+  copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+  vkDestroyBuffer(device, stagingBuffer, nullptr);
+  vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
 void VulkanApplication::createIndexBuffer() {
@@ -871,37 +917,30 @@ void VulkanApplication::createIndexBuffer() {
     return;
   }
 
-  VkBufferCreateInfo bufferInfo{};
-  bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  bufferInfo.size = sizeof(indices[0]) * indices.size();
-  bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-  bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
-  if (vkCreateBuffer(device, &bufferInfo, nullptr, &indexBuffer) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Failed to create index buffer!");
-  }
+  VkBuffer stagingBuffer;
+  VkDeviceMemory stagingBufferMemory;
 
-  VkMemoryRequirements memRequirements;
-  vkGetBufferMemoryRequirements(device, indexBuffer, &memRequirements);
+  createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+               stagingBuffer, stagingBufferMemory);
 
-  VkMemoryAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = memRequirements.size;
-  allocInfo.memoryTypeIndex = findMemoryType(
-      memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-  if (vkAllocateMemory(device, &allocInfo, nullptr, &indexBufferMemory) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Failed to allocate index buffer memory!");
-  }
-
-  vkBindBufferMemory(device, indexBuffer, indexBufferMemory, 0);
   void *data;
-  vkMapMemory(device, indexBufferMemory, 0, bufferInfo.size, 0, &data);
-  memcpy(data, indices.data(), (size_t)bufferInfo.size);
-  vkUnmapMemory(device, indexBufferMemory);
+  vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+  memcpy(data, indices.data(), (size_t)bufferSize);
+  vkUnmapMemory(device, stagingBufferMemory);
+
+  createBuffer(
+      bufferSize,
+      VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+  copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+  vkDestroyBuffer(device, stagingBuffer, nullptr);
+  vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
 void VulkanApplication::createCameraUniformBuffer() {
@@ -1149,9 +1188,9 @@ void VulkanApplication::recordCommandBuffer(VkCommandBuffer commandBuffer,
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
   vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-  for (auto &&submesh : FileParser::subMeshes) {
-    vkCmdDrawIndexed(commandBuffer, submesh.idx_count, 1, submesh.first_idx, 0,
-                     0);
+  if (!indices.empty()) {
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0,
+                     0, 0);
   }
 
   vkCmdEndRenderPass(commandBuffer);
@@ -1606,4 +1645,71 @@ void VulkanApplication::createDepthResources() {
       VK_SUCCESS) {
     throw std::runtime_error("failed to create depth image view!");
   }
+}
+
+void VulkanApplication::createBuffer(VkDeviceSize size,
+                                     VkBufferUsageFlags usage,
+                                     VkMemoryPropertyFlags properties,
+                                     VkBuffer &buffer,
+                                     VkDeviceMemory &bufferMemory) {
+  VkBufferCreateInfo bufferInfo{};
+  bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+  bufferInfo.size = size;
+  bufferInfo.usage = usage;
+  bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+  if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create buffer!");
+  }
+
+  VkMemoryRequirements memRequirements;
+  vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+  VkMemoryAllocateInfo allocInfo{};
+  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  allocInfo.allocationSize = memRequirements.size;
+  // We already have findMemoryType implemented!
+  allocInfo.memoryTypeIndex =
+      findMemoryType(memRequirements.memoryTypeBits, properties);
+
+  if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) !=
+      VK_SUCCESS) {
+    throw std::runtime_error("failed to allocate buffer memory!");
+  }
+
+  vkBindBufferMemory(device, buffer, bufferMemory, 0);
+}
+
+void VulkanApplication::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer,
+                                   VkDeviceSize size) {
+  VkCommandBufferAllocateInfo allocInfo{};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandPool = commandPool;
+  allocInfo.commandBufferCount = 1;
+
+  VkCommandBuffer commandBuffer;
+  vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+  VkCommandBufferBeginInfo beginInfo{};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+  vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+  VkBufferCopy copyRegion{};
+  copyRegion.size = size;
+  vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+  vkEndCommandBuffer(commandBuffer);
+
+  VkSubmitInfo submitInfo{};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &commandBuffer;
+
+  vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueWaitIdle(graphicsQueue);
+
+  vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 }

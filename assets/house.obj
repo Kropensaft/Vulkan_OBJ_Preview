@@ -1,0 +1,58 @@
+#house.obj - A multi-group test mesh
+mtllib house.mtl
+
+# --- VERTICES ---
+# Base of the house (Z = 0)
+v -1.0 0.0  1.0
+v  1.0 0.0  1.0
+v  1.0 0.0 -1.0
+v -1.0 0.0 -1.0
+# Top of the walls (Z = 1)
+v -1.0 1.0  1.0
+v  1.0 1.0  1.0
+v  1.0 1.0 -1.0
+v -1.0 1.0 -1.0
+# Peak of the roof
+v  0.0 2.0  0.0
+
+# --- NORMALS ---
+vn  0.0  1.0  0.0
+vn  0.0 -1.0  0.0
+vn  1.0  0.0  0.0
+vn -1.0  0.0  0.0
+vn  0.0  0.0  1.0
+vn  0.0  0.0 -1.0
+
+# ==========================================
+# GROUP 1: The Walls
+# ==========================================
+g Walls
+usemtl WallMaterial
+
+# Front Wall
+f 1//5 2//5 6//5
+f 1//5 6//5 5//5
+# Right Wall
+f 2//3 3//3 7//3
+f 2//3 7//3 6//3
+# Back Wall
+f 3//6 4//6 8//6
+f 3//6 8//6 7//6
+# Left Wall
+f 4//4 1//4 5//4
+f 4//4 5//4 8//4
+
+# ==========================================
+# GROUP 2: The Roof
+# ==========================================
+g Roof
+usemtl RoofMaterial
+
+# Roof Front
+f 5//1 6//1 9//1
+# Roof Right
+f 6//1 7//1 9//1
+# Roof Back
+f 7//1 8//1 9//1
+# Roof Left
+f 8//1 5//1 9//1
