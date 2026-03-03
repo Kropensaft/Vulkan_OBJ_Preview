@@ -1,8 +1,8 @@
 #if defined(_WIN32)
-
+#include <windows.h>
 #include "menu_win.hpp"
 #include <commdlg.h>
-#include <windows.h>
+
 
 // Define IDs for menu actions
 #define IDM_FILE_OPEN 1001

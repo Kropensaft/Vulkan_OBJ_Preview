@@ -1,8 +1,9 @@
 # Minimum required version of CMake
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.12...3.30)
 # Project name and language
 project(VulkanApp CXX)
 add_compile_definitions(GLM_FORCE_DEPTH_ZERO_TO_ONE)
+add_compile_definitions(VK_ENABLE_BETA_EXTENSIONS)
 
 include(FetchContent)
 
@@ -26,7 +27,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find necessary packages
 find_package(Vulkan REQUIRED)
-find_package(glfw3 3.3 REQUIRED)
+# find_package(glfw3 3.3 REQUIRED)
 
 # List all source files from the src directory
 file(GLOB_RECURSE SOURCES "src/*.cpp")
@@ -36,6 +37,7 @@ list(FILTER SOURCES EXCLUDE REGEX "/\\._")
 
 # Create the executable target
 add_executable(${PROJECT_NAME} ${SOURCES})
+target_compile_definitions(VulkanApp PRIVATE ASSET_DIR="${CMAKE_SOURCE_DIR}/assets/")
  
 add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD
@@ -43,6 +45,8 @@ add_custom_command(
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Compiling GLSL shaders to SPIR-V"
 )
+
+
 
 # Tell the target where its header files are
 target_include_directories(${PROJECT_NAME} PUBLIC
@@ -54,6 +58,7 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         Vulkan::Vulkan
         glfw
+        glm
 )
 
 
@@ -112,7 +117,7 @@ elseif(WIN32)
 
     target_link_libraries(${PROJECT_NAME} PRIVATE User32 Comdlg32)
 
-    set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+    # set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
 
     add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD

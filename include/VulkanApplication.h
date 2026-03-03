@@ -11,6 +11,7 @@
 #include <glm/gtx/io.hpp>
 #include <memory>
 #include <vector>
+#define VK_ENABLE_BETA_EXTENSIONS
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 

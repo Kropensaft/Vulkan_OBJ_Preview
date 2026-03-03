@@ -157,7 +157,7 @@ static void parse_texture_coord(std::string &line) {
   iss >> prefix;
 
   if (!(iss >> texCoord.x >> texCoord.y)) {
-    std::cout << "Third tex-coordinate acquired but not parsed" << std::endl;
+    std::cout << "Third tex-coordinate acquired but not parsed" << std::endl;
   }
   temp_texcoords.push_back(texCoord);
 }
