@@ -353,7 +353,6 @@ void FileParser::parse_OBJ(const char *filePath) {
   VulkanApplication::indices.clear();
 
   std::map<VertexIndex, uint32_t, VertexIndexComparator> uniqueVertices;
-
   for (const auto &[objectName, triangles] : FileParser::groupedTriangles) {
 
     SubMesh currentSubMesh;
@@ -382,8 +381,8 @@ void FileParser::parse_OBJ(const char *filePath) {
         VertexIndex vi = tri.vertices[i];
         Vertex vertex{};
 
-        vertex.pos = temp_positions[vi.v_idx - 1];
         vertex.color = faceColor;
+        vertex.pos = temp_positions[vi.v_idx - 1];
 
         if (vi.vn_idx > 0 && vi.vn_idx <= temp_normals.size()) {
           vertex.normal = temp_normals[vi.vn_idx - 1];

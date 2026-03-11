@@ -6,13 +6,14 @@ if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 
 # 2. Install Build Tools (Visual Studio Build Tools)
 Write-Host "Installing C++ Build Tools..."
-winget install Microsoft.VisualStudio.2022.BuildTools --override "--add Microsoft.VisualStudio.Workload.VCTools" --silent
+winget install Microsoft.VisualStudio.2026.BuildTools --override "--add Microsoft.VisualStudio.Workload.VCTools" --silent
 
 # 3. Install CMake and Git
+Write-Host "Installing CMake and Git..."
 winget install Kitware.CMake Git.Git --silent
 
 # 4. Install Vulkan SDK
 Write-Host "Installing Vulkan SDK..."
-winget install LunarG.VulkanSDK --silent
+winget install -e --id KhronosGroup.VulkanSDK 
 
-Write-Host "Done! Your .exe is in the build folder."
+Write-Host "Done installing..."
