@@ -11,7 +11,11 @@
 #include <glm/gtx/io.hpp>
 #include <memory>
 #include <vector>
+
+#ifndef VK_ENABLE_BETA_EXTENSIONS
 #define VK_ENABLE_BETA_EXTENSIONS
+#endif
+
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
@@ -29,14 +33,14 @@ struct UniformBufferObject {
 };
 
 class VulkanApplication {
-private:
-  static VulkanApplication *appInstance;
-
 public:
+  static VulkanApplication &getInstance() {
+    static VulkanApplication instance;
+    return instance;
+  }
+
   VulkanApplication(const VulkanApplication &) = delete;
   VulkanApplication &operator=(const VulkanApplication &) = delete;
-
-  static VulkanApplication *getInstance() { return appInstance; }
 
   static void toggleWireframe();
   static void zoomIn();
@@ -69,10 +73,6 @@ private:
 
   void initVulkan();
   void mainLoop();
-  void createInstance();
-  void createSurface();
-  void pickPhysicalDevice();
-  void createLogicalDevice();
   void createSwapChain();
   void createImageViews();
   void createRenderPass();

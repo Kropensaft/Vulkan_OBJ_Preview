@@ -419,5 +419,5 @@ void FileParser::parse_OBJ(const char *filePath) {
                            VulkanApplication::vertices.size(),
                            VulkanApplication::indices.size());
 
-  auto app = VulkanApplication::getInstance();
+  //  auto &app = VulkanApplication::getInstance();
 }

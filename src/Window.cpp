@@ -1,25 +1,22 @@
 #include "Window.h"
-#include "CameraController.h"
 #include "VulkanApplication.h"
-#include <stdexcept>
 #include <iostream>
+#include <stdexcept>
 
 #ifdef _WIN32
-    #define GLFW_EXPOSE_NATIVE_WIN32
-    #include <windows.h>
-    #include <GLFW/glfw3native.h>
-    #include <functional> // We need this for std::function
-    
-    // The exact signature the linker is looking for
-    void create_windows_menu_bar(
-        void *native_window_handle,
-        std::function<void(const char *)> file_callback,
-        std::function<void()> wireframeCallback,
-        std::function<void()> zoomInCallback,
-        std::function<void()> zoomOutCallback,
-        std::function<void()> switchLSCallback,
-        std::function<void(double)> zoomSensCallback
-    );
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#include <functional> // We need this for std::function
+#include <windows.h>
+
+// The exact signature the linker is looking for
+void create_windows_menu_bar(void *native_window_handle,
+                             std::function<void(const char *)> file_callback,
+                             std::function<void()> wireframeCallback,
+                             std::function<void()> zoomInCallback,
+                             std::function<void()> zoomOutCallback,
+                             std::function<void()> switchLSCallback,
+                             std::function<void(double)> zoomSensCallback);
 #endif
 
 #if defined(__APPLE__)
@@ -40,7 +37,7 @@ void loadModelFromFile(const char *filepath) {
   } catch (const std::exception &e) {
     std::cerr << "Failed to load model: " << e.what() << std::endl;
   }
-  VulkanApplication::getInstance()->recreateGeometryBuffers();
+  VulkanApplication::getInstance().recreateGeometryBuffers();
 }
 
 void renderWireframe(void) { VulkanApplication::toggleWireframe(); }
@@ -83,7 +80,7 @@ void Window::initWindow() {
                         &renderWireframe, &Window::zoomIn, &Window::zoomOut,
                         &Window::switchLS, &Window::setZoom);
 #elif defined(_WIN32)
-  void *native_window_handle = (void*)glfwGetWin32Window(window);
+  void *native_window_handle = (void *)glfwGetWin32Window(window);
   create_windows_menu_bar(native_window_handle, &loadModelFromFile,
                           &renderWireframe, &Window::zoomIn, &Window::zoomOut,
                           &Window::switchLS, &Window::setZoom);

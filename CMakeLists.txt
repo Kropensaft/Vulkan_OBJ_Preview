@@ -13,7 +13,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find necessary packages
 find_package(Vulkan REQUIRED)
-# find_package(glfw3 3.3 REQUIRED)
+find_package(glfw3 3.3 REQUIRED)
+find_package(glm REQUIRED)
 
 # List all source files from the src directory
 file(GLOB_RECURSE SOURCES "src/*.cpp")
@@ -44,7 +45,7 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         Vulkan::Vulkan
         glfw
-        glm
+	glm::glm
 )
 
 

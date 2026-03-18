@@ -14,7 +14,6 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
-VulkanApplication *VulkanApplication::appInstance = nullptr;
 bool VulkanApplication::renderWireframe = false;
 PFN_vkCmdSetPolygonModeEXT VulkanApplication::vkCmdSetPolygonModeEXT = nullptr;
 float VulkanApplication::deltaTime = 0.0f;
@@ -35,33 +34,19 @@ static std::vector<char> readFile(const std::string &filename) {
 }
 
 void VulkanApplication::toggleWireframe() {
-  if (appInstance) {
-    appInstance->instanceToggleWireframe();
-  }
+  getInstance().instanceToggleWireframe();
 }
 
-void VulkanApplication::zoomIn() {
-  if (appInstance) {
-    appInstance->instanceZoomIn();
-  }
-}
+void VulkanApplication::zoomIn() { getInstance().instanceZoomIn(); }
 
-void VulkanApplication::zoomOut() {
-  if (appInstance) {
-    appInstance->instanceZoomOut();
-  }
-}
+void VulkanApplication::zoomOut() { getInstance().instanceZoomOut(); }
 
 void VulkanApplication::setZoomSpeed(double speed) {
-  if (appInstance) {
-    appInstance->instanceSetZoomSpeed(speed);
-  }
+  getInstance().instanceSetZoomSpeed(speed);
 }
 
 void VulkanApplication::switchLightSourcePosition() {
-  if (appInstance) {
-    appInstance->instanceSwitchLS();
-  }
+  getInstance().instanceSwitchLS();
 }
 
 void VulkanApplication::instanceLoadNewModel(const char *filePath) {
@@ -129,7 +114,7 @@ void VulkanApplication::cleanupGeometryBuffers() {
 
 void VulkanApplication::recreateGeometryBuffers() {
 
-  // FIX: Wait before deallocating since it may be called mid frame
+  // WARN: Wait before deallocating since it may be called mid frame
   vkDeviceWaitIdle(device);
 
   cleanupGeometryBuffers();
@@ -142,8 +127,6 @@ void VulkanApplication::recreateGeometryBuffers() {
 }
 
 void VulkanApplication::run() {
-  appInstance = this;
-
   window = std::make_unique<Window>(CONSTANTS::WIDTH, CONSTANTS::HEIGHT,
                                     "OBJ Viewer");
 
@@ -231,7 +214,7 @@ void VulkanApplication::cleanup() {
   vkDestroyDescriptorSetLayout(device, globalSetLayout, nullptr);
   vkDestroyDescriptorSetLayout(device, textureSetLayout, nullptr);
 
-  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+  for (size_t i = 0; i < CONSTANTS::MAX_FRAMES_IN_FLIGHT; i++) {
     vkDestroyBuffer(device, normalMatrixUniformBuffers[i], nullptr);
     vkFreeMemory(device, normalMatrixUniformBuffersMemory[i], nullptr);
     vkDestroyBuffer(device, cameraUniformBuffers[i], nullptr);
@@ -251,7 +234,7 @@ void VulkanApplication::cleanup() {
   vkDestroyImageView(device, shadowImageView, nullptr);
   vkDestroyImage(device, shadowImage, nullptr);
 
-  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+  for (size_t i = 0; i < CONSTANTS::MAX_FRAMES_IN_FLIGHT; i++) {
     vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
     vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
     vkDestroyFence(device, inFlightFences[i], nullptr);
@@ -276,8 +259,6 @@ void VulkanApplication::cleanup() {
   vkDestroyDevice(device, nullptr);
   vkDestroySurfaceKHR(instance, surface, nullptr);
   vkDestroyInstance(instance, nullptr);
-
-  appInstance = nullptr;
 }
 
 void VulkanApplication::drawFrame() {
@@ -325,134 +306,6 @@ void VulkanApplication::drawFrame() {
 
   vkQueuePresentKHR(graphicsQueue, &presentInfo);
   currentFrame = (currentFrame + 1) % CONSTANTS::MAX_FRAMES_IN_FLIGHT;
-}
-
-void VulkanApplication::createInstance() {
-  VkApplicationInfo appInfo{};
-  appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  appInfo.pApplicationName = "Vulkan App";
-  appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-  appInfo.pEngineName = "No Engine";
-  appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-  appInfo.apiVersion = VK_API_VERSION_1_0;
-
-  VkInstanceCreateInfo createInfo{};
-  createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-  createInfo.pApplicationInfo = &appInfo;
-
-  uint32_t glfwExtensionCount = 0;
-  const char **glfwExtensions =
-      glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-  std::vector<const char *> extensions(glfwExtensions,
-                                       glfwExtensions + glfwExtensionCount);
-  extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-  extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-
-  createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-  createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-  createInfo.ppEnabledExtensionNames = extensions.data();
-
-#ifdef NDEBUG
-  const bool enableValidationLayers = false;
-#else
-  const bool enableValidationLayers = true;
-#endif
-
-  const std::vector<const char *> validationLayers = {
-      "VK_LAYER_KHRONOS_validation"};
-
-  if (enableValidationLayers) {
-    std::cout << "Vulkan Validation Layers: ENABLED" << std::endl;
-    createInfo.enabledLayerCount =
-        static_cast<uint32_t>(validationLayers.size());
-    createInfo.ppEnabledLayerNames = validationLayers.data();
-  } else {
-    std::cout << "Vulkan Validation Layers: DISABLED (Fast Mode)" << std::endl;
-    createInfo.enabledLayerCount = 0;
-    createInfo.ppEnabledLayerNames = nullptr;
-  }
-
-  if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create instance!");
-  }
-}
-
-void VulkanApplication::createSurface() {
-  window->createWindowSurface(instance, &surface);
-}
-
-void VulkanApplication::pickPhysicalDevice() {
-  uint32_t deviceCount = 0;
-  vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
-  if (deviceCount == 0) {
-    throw std::runtime_error("failed to find GPUs with Vulkan support!");
-  }
-  std::vector<VkPhysicalDevice> devices(deviceCount);
-  vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
-  physicalDevice = devices[0];
-}
-
-void VulkanApplication::createLogicalDevice() {
-  float queuePriority = 1.0f;
-  VkDeviceQueueCreateInfo queueCreateInfo{};
-  queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  queueCreateInfo.queueFamilyIndex = 0;
-  queueCreateInfo.queueCount = CONSTANTS::descriptor_vals.Q_CNT;
-  queueCreateInfo.pQueuePriorities = &queuePriority;
-
-  VkPhysicalDeviceExtendedDynamicState3FeaturesEXT dynamicState3Features{};
-  dynamicState3Features.sType =
-      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
-  dynamicState3Features.extendedDynamicState3PolygonMode = VK_TRUE;
-
-  VkPhysicalDeviceFeatures2 deviceFeatures2{};
-  deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  deviceFeatures2.pNext = &dynamicState3Features;
-  deviceFeatures2.features.fillModeNonSolid = VK_TRUE;
-
-  VkDeviceCreateInfo createInfo{};
-  createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  createInfo.queueCreateInfoCount = CONSTANTS::descriptor_vals.Q_CNT;
-  createInfo.pQueueCreateInfos = &queueCreateInfo;
-  createInfo.pEnabledFeatures = nullptr;
-  createInfo.pNext = &deviceFeatures2;
-
-  std::vector<const char *> deviceExtensions = {
-      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME};
-
-  // Dynamically check if the physical device requires the portability subset
-  // (for macOS)
-  uint32_t extensionCount;
-  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount,
-                                       nullptr);
-  std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount,
-                                       availableExtensions.data());
-
-  for (const auto &extension : availableExtensions) {
-    if (strcmp(extension.extensionName, "VK_KHR_portability_subset") == 0) {
-      deviceExtensions.push_back("VK_KHR_portability_subset");
-      break;
-    }
-  }
-  createInfo.enabledExtensionCount =
-      static_cast<uint32_t>(deviceExtensions.size());
-  createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-
-  if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("failed to create logical device!");
-  }
-  vkCmdSetPolygonModeEXT = (PFN_vkCmdSetPolygonModeEXT)vkGetDeviceProcAddr(
-      device, "vkCmdSetPolygonModeEXT");
-
-  if (!vkCmdSetPolygonModeEXT) {
-    throw std::runtime_error(
-        "Failed to load vkCmdSetPolygonModeEXT function pointer!");
-  }
-
-  vkGetDeviceQueue(device, 0, 0, &graphicsQueue);
 }
 
 void VulkanApplication::createSwapChain() {
@@ -861,7 +714,7 @@ void VulkanApplication::createCommandPool() {
 }
 
 void VulkanApplication::createCommandBuffers() {
-  commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+  commandBuffers.resize(CONSTANTS::MAX_FRAMES_IN_FLIGHT);
   VkCommandBufferAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.commandPool = commandPool;
@@ -875,16 +728,16 @@ void VulkanApplication::createCommandBuffers() {
 }
 
 void VulkanApplication::createSyncObjects() {
-  imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-  renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-  inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+  imageAvailableSemaphores.resize(CONSTANTS::MAX_FRAMES_IN_FLIGHT);
+  renderFinishedSemaphores.resize(CONSTANTS::MAX_FRAMES_IN_FLIGHT);
+  inFlightFences.resize(CONSTANTS::MAX_FRAMES_IN_FLIGHT);
   VkSemaphoreCreateInfo semaphoreInfo{};
   semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
   VkFenceCreateInfo fenceInfo{};
   fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+  for (size_t i = 0; i < CONSTANTS::MAX_FRAMES_IN_FLIGHT; i++) {
     if (vkCreateSemaphore(device, &semaphoreInfo, nullptr,
                           &imageAvailableSemaphores[i]) != VK_SUCCESS ||
         vkCreateSemaphore(device, &semaphoreInfo, nullptr,
@@ -981,7 +834,7 @@ void VulkanApplication::createCameraUniformBuffer() {
   cameraUniformBuffersMemory.resize(CONSTANTS::MAX_FRAMES_IN_FLIGHT);
   cameraUniformBuffersMapped.resize(CONSTANTS::MAX_FRAMES_IN_FLIGHT);
 
-  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+  for (size_t i = 0; i < CONSTANTS::MAX_FRAMES_IN_FLIGHT; i++) {
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = bufferSize;
@@ -1074,9 +927,8 @@ void VulkanApplication::createDescriptorPool() {
 }
 
 void VulkanApplication::createDescriptorSets() {
-  // 1. Allocate Global Sets (Set 0)
-  std::vector<VkDescriptorSetLayout> globalLayouts(MAX_FRAMES_IN_FLIGHT,
-                                                   globalSetLayout);
+  std::vector<VkDescriptorSetLayout> globalLayouts(
+      CONSTANTS::MAX_FRAMES_IN_FLIGHT, globalSetLayout);
   VkDescriptorSetAllocateInfo globalAllocInfo{};
   globalAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   globalAllocInfo.descriptorPool = descriptorPool;
@@ -1103,8 +955,7 @@ void VulkanApplication::createDescriptorSets() {
     throw std::runtime_error("failed to allocate texture descriptor sets!");
   }
 
-  // 3. Update Descriptors
-  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+  for (size_t i = 0; i < CONSTANTS::MAX_FRAMES_IN_FLIGHT; i++) {
     VkDescriptorBufferInfo cameraInfo{};
     cameraInfo.buffer = cameraUniformBuffers[i];
     cameraInfo.offset = 0;
@@ -1292,7 +1143,7 @@ void VulkanApplication::createNormalMatrixUniformBuffer() {
   normalMatrixUniformBuffersMemory.resize(CONSTANTS::MAX_FRAMES_IN_FLIGHT);
   normalMatrixUniformBuffersMapped.resize(CONSTANTS::MAX_FRAMES_IN_FLIGHT);
 
-  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+  for (size_t i = 0; i < CONSTANTS::MAX_FRAMES_IN_FLIGHT; i++) {
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = bufferSize;
