@@ -14,6 +14,7 @@ Icon
 .Trashes
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
+.cache/*
 
 # Windows (Good to include for cross-platform repos)
 Thumbs.db
