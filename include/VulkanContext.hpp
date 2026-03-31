@@ -13,7 +13,6 @@ public:
   VulkanContext(const VulkanContext &) = delete;
   VulkanContext &operator=(const VulkanContext &) = delete;
 
-  // Gettery pro ostatní systémy
   VkDevice getDevice() const { return device; }
   VkPhysicalDevice getPhysicalDevice() const { return physicalDevice; }
   VkInstance getInstance() const { return instance; }

@@ -132,13 +132,6 @@ void VulkanContext::createLogicalDevice() {
       VK_SUCCESS) {
     throw std::runtime_error("failed to create logical device!");
   }
-  vkCmdSetPolygonModeEXT = (PFN_vkCmdSetPolygonModeEXT)vkGetDeviceProcAddr(
-      device, "vkCmdSetPolygonModeEXT");
-
-  if (!vkCmdSetPolygonModeEXT) {
-    throw std::runtime_error(
-        "Failed to load vkCmdSetPolygonModeEXT function pointer!");
-  }
 
   vkGetDeviceQueue(device, 0, 0, &graphicsQueue);
 }

@@ -5,6 +5,7 @@
 int main() {
 
   try {
+    VulkanApplication::getInstance().initVulkan();
     VulkanApplication::getInstance().run();
   } catch (const std::exception &e) {
     std::cerr << "ERROR: " << e.what() << std::endl;

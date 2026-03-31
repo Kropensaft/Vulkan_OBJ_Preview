@@ -2,19 +2,23 @@
 #include "VulkanApplication.h"
 #include <stdexcept>
 
-uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter,
+                        VkMemoryPropertyFlags properties) {
   VkPhysicalDeviceMemoryProperties memProperties;
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
 
   for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-    if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+    if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags &
+                                    properties) == properties) {
       return i;
     }
   }
   throw std::runtime_error("failed to find suitable memory type!");
 }
 
-DirectionalLight::DirectionalLight(VulkanApplication &app, glm::vec3 lightDirection, glm::vec4 lightColor)
+DirectionalLight::DirectionalLight(VulkanApplication &app,
+                                   glm::vec3 lightDirection,
+                                   glm::vec4 lightColor)
     : app(app) {
 
   // NOTE:  Initialize the Uniform Buffer Object data
@@ -25,8 +29,8 @@ DirectionalLight::DirectionalLight(VulkanApplication &app, glm::vec3 lightDirect
 }
 
 DirectionalLight::~DirectionalLight() {
-  vkDestroyBuffer(app.getDevice(), uniformBuffer, nullptr);
-  vkFreeMemory(app.getDevice(), uniformBufferMemory, nullptr);
+  vkDestroyBuffer(app.context_->getDevice(), uniformBuffer, nullptr);
+  vkFreeMemory(app.context_->getDevice(), uniformBufferMemory, nullptr);
 }
 
 void DirectionalLight::createUniformBuffer() {
@@ -38,36 +42,40 @@ void DirectionalLight::createUniformBuffer() {
   bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  if (vkCreateBuffer(app.getDevice(), &bufferInfo, nullptr, &uniformBuffer) != VK_SUCCESS) {
+  if (vkCreateBuffer(app.context_->getDevice(), &bufferInfo, nullptr,
+                     &uniformBuffer) != VK_SUCCESS) {
     throw std::runtime_error("failed to create uniform buffer!");
   }
 
   VkMemoryRequirements memRequirements;
-  vkGetBufferMemoryRequirements(app.getDevice(), uniformBuffer, &memRequirements);
+  vkGetBufferMemoryRequirements(app.context_->getDevice(), uniformBuffer,
+                                &memRequirements);
 
   VkMemoryAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
   allocInfo.allocationSize = memRequirements.size;
-  allocInfo.memoryTypeIndex = findMemoryType(app.getPhysicalDevice(), memRequirements.memoryTypeBits,
-                                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  allocInfo.memoryTypeIndex = findMemoryType(
+      app.context_->getPhysicalDevice(), memRequirements.memoryTypeBits,
+      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-  if (vkAllocateMemory(app.getDevice(), &allocInfo, nullptr, &uniformBufferMemory) != VK_SUCCESS) {
+  if (vkAllocateMemory(app.context_->getDevice(), &allocInfo, nullptr,
+                       &uniformBufferMemory) != VK_SUCCESS) {
     throw std::runtime_error("failed to allocate uniform buffer memory!");
   }
 
-  vkBindBufferMemory(app.getDevice(), uniformBuffer, uniformBufferMemory, 0);
+  vkBindBufferMemory(app.context_->getDevice(), uniformBuffer,
+                     uniformBufferMemory, 0);
 
   void *data;
-  vkMapMemory(app.getDevice(), uniformBufferMemory, 0, bufferSize, 0, &data);
+  vkMapMemory(app.context_->getDevice(), uniformBufferMemory, 0, bufferSize, 0,
+              &data);
   memcpy(data, &ubo, bufferSize);
-  vkUnmapMemory(app.getDevice(), uniformBufferMemory);
+  vkUnmapMemory(app.context_->getDevice(), uniformBufferMemory);
 }
 
 VkDescriptorBufferInfo DirectionalLight::getDescriptorInfo() const {
-  return VkDescriptorBufferInfo{
-      uniformBuffer,
-      0,
-      sizeof(DirectionalLightUBO)};
+  return VkDescriptorBufferInfo{uniformBuffer, 0, sizeof(DirectionalLightUBO)};
 }
 
 void DirectionalLight::setDirection(glm::vec3 newDirection) {
@@ -83,10 +91,11 @@ void DirectionalLight::updateLightSpaceMatrix(glm::mat4 matrix) {
 
   void *data;
   VkDeviceSize bufferSize = sizeof(DirectionalLightUBO);
-  vkMapMemory(app.getDevice(), uniformBufferMemory, 0, bufferSize, 0, &data);
+  vkMapMemory(app.context_->getDevice(), uniformBufferMemory, 0, bufferSize, 0,
+              &data);
   // NOTE: The UBO is fully replaced to ensure consistency
   memcpy(data, &ubo, bufferSize);
-  vkUnmapMemory(app.getDevice(), uniformBufferMemory);
+  vkUnmapMemory(app.context_->getDevice(), uniformBufferMemory);
 }
 
 void DirectionalLight::updateDirection(glm::vec3 newDirection) {
@@ -94,7 +103,8 @@ void DirectionalLight::updateDirection(glm::vec3 newDirection) {
 
   void *data;
   VkDeviceSize bufferSize = sizeof(DirectionalLightUBO);
-  vkMapMemory(app.getDevice(), uniformBufferMemory, 0, bufferSize, 0, &data);
+  vkMapMemory(app.context_->getDevice(), uniformBufferMemory, 0, bufferSize, 0,
+              &data);
   memcpy(data, &ubo, bufferSize);
-  vkUnmapMemory(app.getDevice(), uniformBufferMemory);
+  vkUnmapMemory(app.context_->getDevice(), uniformBufferMemory);
 }

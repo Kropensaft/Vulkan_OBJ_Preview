@@ -1,6 +1,7 @@
 #ifndef VULKAN_APPLICATION_H
 #define VULKAN_APPLICATION_H
 
+#include "VulkanContext.hpp"
 #define GLM_ENABLE_EXPERIMENTAL
 #include "CameraController.h"
 #include "DirectionalLight.h"
@@ -48,10 +49,9 @@ public:
   static void switchLightSourcePosition();
   static void setZoomSpeed(double);
 
-  VkDevice getDevice() { return device; }
-  VkPhysicalDevice getPhysicalDevice() { return physicalDevice; }
-
   void recreateGeometryBuffers();
+
+  void initVulkan();
   void run();
   void cleanup();
   static const float &getDeltaTime();
@@ -62,6 +62,8 @@ public:
 
   VulkanApplication() = default;
 
+  std::unique_ptr<VulkanContext> context_;
+
 private:
   void instanceLoadNewModel(const char *filePath);
   void instanceToggleWireframe();
@@ -71,7 +73,6 @@ private:
   void instanceSwitchLS();
   void cleanupGeometryBuffers();
 
-  void initVulkan();
   void mainLoop();
   void createSwapChain();
   void createImageViews();
@@ -125,11 +126,6 @@ private:
   VkImageView depthImageView;
 
   std::unique_ptr<Window> window;
-  VkInstance instance;
-  VkSurfaceKHR surface;
-  VkPhysicalDevice physicalDevice;
-  VkDevice device;
-  VkQueue graphicsQueue;
   VkSwapchainKHR swapChain;
   std::vector<VkImage> swapChainImages;
   VkFormat swapChainImageFormat;
