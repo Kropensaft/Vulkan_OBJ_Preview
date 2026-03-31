@@ -35,9 +35,11 @@ struct UniformBufferObject {
 
 class VulkanApplication {
 public:
+  // INFO: were creating the object dynamically so that when it terminates on
+  // macOS it doesnt cause a crash
   static VulkanApplication &getInstance() {
-    static VulkanApplication instance;
-    return instance;
+    static VulkanApplication *instance = new VulkanApplication();
+    return *instance;
   }
 
   VulkanApplication(const VulkanApplication &) = delete;

@@ -66,19 +66,6 @@ enum class ObjLineType {
 
 constexpr double SCALE = 0.1;
 
-struct VertexIndexComparator {
-  bool operator()(const VertexIndex &a, const VertexIndex &b) const {
-    if (a.v_idx != b.v_idx)
-      return a.v_idx < b.v_idx;
-    if (a.vn_idx != b.vn_idx)
-      return a.vn_idx < b.vn_idx;
-    if (a.vt_idx != b.vt_idx)
-      return a.vt_idx < b.vt_idx;
-
-    return a.material_name < b.material_name;
-  }
-};
-
 class FileParser {
 public:
   static void read_OBJ();
@@ -105,6 +92,7 @@ public:
   static void set_current_material(std::string &line);
   static void parse_object(std::string &line);
   static void parse_group(std::string &line);
+  static void parse_face(const char *&cursor);
 
 private:
   static std::string current_material;
@@ -113,6 +101,11 @@ private:
 
   static std::unordered_map<std::string, Material> materials;
   static const std::unordered_map<std::string_view, ObjLineType> prefixMap;
+
+  static void readFileToBuffer(const char *filePath, std::vector<char> &buffer);
+  static void parseBuffer(const std::vector<char> &buffer,
+                          const std::string &base_dir);
+  static void assembleMeshes();
 };
 
 #endif
