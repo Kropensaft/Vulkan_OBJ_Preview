@@ -1,6 +1,7 @@
 #ifndef VULKAN_CONTEXT_HPP
 #define VULKAN_CONTEXT_HPP
 #include "Window.h"
+#include <cstring>
 #include <stdexcept>
 #include <vector>
 #include <vulkan/vulkan.h>
