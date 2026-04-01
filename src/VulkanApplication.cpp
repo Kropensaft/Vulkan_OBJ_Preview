@@ -164,7 +164,12 @@ void VulkanApplication::initVulkan() {
   createCommandPool();
 
   FileParser parser;
+
+#if defined(__APPLE_)
   parser.parse_OBJ(CONSTANTS::DEFAULT_OBJ_PATH);
+#elif defined(__WIN32)
+  parser.parse_OBJ(ASSET_DIR "teapot.obj");
+#endif
 
   createVertexBuffer();
   createIndexBuffer();
