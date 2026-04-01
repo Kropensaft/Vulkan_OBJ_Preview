@@ -1,40 +1,41 @@
 @echo off
 echo Installing dependencies for Vulkan Tutorial...
 
-:: Check if vcpkg is installed
-where vcpkg >nul 2>nul
+:: 1. Check for CMake
+where cmake >nul 2>nul
 if %ERRORLEVEL% neq 0 (
-    echo vcpkg not found. Please install vcpkg first.
-    echo Visit https://github.com/microsoft/vcpkg for installation instructions.
-    echo Typically, you would:
-    echo 1. git clone https://github.com/Microsoft/vcpkg.git
-    echo 2. cd vcpkg
-    echo 3. .\bootstrap-vcpkg.bat
-    echo 4. Add vcpkg to your PATH
+    echo [ERROR] CMake not found. Please install CMake from https://cmake.org/download/
+    exit /b 1
+)
+echo Found CMake.
+
+:: 2. Check if vcpkg is in PATH or current directory
+where vcpkg >nul 2>nul
+if %ERRORLEVEL% equ 0 (
+    set VCPKG_EXE=vcpkg
+) else if exist ".\vcpkg.exe" (
+    set VCPKG_EXE=.\vcpkg
+) else (
+    echo [ERROR] vcpkg not found.
+    echo Please git clone https://github.com/Microsoft/vcpkg.git and run .\bootstrap-vcpkg.bat
     exit /b 1
 )
 
-:: Enable binary caching for vcpkg
+:: 3. Enable binary caching
 echo Enabling binary caching for vcpkg...
 set VCPKG_BINARY_SOURCES=clear;files,%TEMP%\vcpkg-cache,readwrite
-
-:: Create cache directory if it doesn't exist
 if not exist %TEMP%\vcpkg-cache mkdir %TEMP%\vcpkg-cache
 
-:: Install all dependencies at once using vcpkg in classic mode
-echo Installing all dependencies...
-vcpkg install glfw3 glm tinyobjloader stb tinygltf nlohmann-json ktx[vulkan] openal-soft --triplet=x64-windows
+:: 4. Install dependencies
+echo Installing libraries via vcpkg...
+%VCPKG_EXE% install glfw3 glm tinyobjloader stb tinygltf nlohmann-json ktx[vulkan] openal-soft --triplet=x64-windows
 
-:: Remind about Vulkan SDK
+:: 5. Final Instructions
 echo.
 echo Don't forget to install the Vulkan SDK from https://vulkan.lunarg.com/
 echo.
-
-echo All dependencies have been installed successfully!
-echo You can now use CMake to build your Vulkan project.
-echo.
-echo Example CMake command:
+echo All dependencies installed!
+echo To build, use:
 echo cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=[path\to\vcpkg]\scripts\buildsystems\vcpkg.cmake
-echo cmake --build build
 
 exit /b 0
