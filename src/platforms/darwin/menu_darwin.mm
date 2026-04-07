@@ -1,11 +1,10 @@
-#include "menu_darwin.h" // Include the C header we just created
+#include "menu_darwin.h"
 #include <AppKit/AppKit.h>
 #import <Cocoa/Cocoa.h>
 #include <cstddef>
 #include <objc/runtime.h>
 
 // A simple helper class to act as the target for the menu item's action.
-// This is a cleaner approach than using global state.
 @interface MenuActionTarget : NSObject
 @property(nonatomic, assign) OpenFileCallback openFileCallback;
 - (void)openFileAction:(id)sender;

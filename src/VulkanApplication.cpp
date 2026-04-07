@@ -165,9 +165,9 @@ void VulkanApplication::initVulkan() {
 
   FileParser parser;
 
-#if defined(__APPLE_)
+#if defined(__APPLE__)
   parser.parse_OBJ(CONSTANTS::DEFAULT_OBJ_PATH);
-#elif defined(__WIN32)
+#elif defined(_WIN32)
   parser.parse_OBJ(ASSET_DIR "teapot.obj");
 #endif
 

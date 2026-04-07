@@ -1,3 +1,7 @@
+/**
+ * @file FileParser.h
+ * @brief Tools and data structures for parsing 3D OBJ models and MTL materials.
+ */
 #ifndef FILE_PARSER_H
 #define FILE_PARSER_H
 
@@ -13,35 +17,59 @@
 
 constexpr short MATERIAL_ARR_SIZE = 3;
 
+/**
+ * @struct SubMesh
+ * @brief Data structure representing a sub-mesh (part of geometry often bound
+ * to one material).
+ */
 struct SubMesh {
-  std::string name;
-  uint32_t first_idx;
-  uint32_t idx_count;
+  std::string name;   ///< Name of the sub-mesh
+  uint32_t first_idx; ///< Index of the first vertex in the global index buffer
+  uint32_t idx_count; ///< Total number of indices belonging to this sub-mesh
 };
 
+/**
+ * @struct Vertex
+ * @brief Represents a single vertex of a 3D model.
+ */
 struct Vertex {
-  glm::vec3 pos;
-  glm::vec3 color;
-  glm::vec3 normal;
-  glm::vec2 texCoord;
+  glm::vec3 pos;      ///< 3D position (x, y, z)
+  glm::vec3 color;    ///< Vertex color (r, g, b)
+  glm::vec3 normal;   ///< Normal vector for lighting calculations
+  glm::vec2 texCoord; ///< Texture UV coordinates
 
+  /** @brief Returns the binding description for the Vulkan pipeline. */
   static VkVertexInputBindingDescription getBindingDescription();
+
+  /** @brief Returns attribute descriptions for the Vulkan pipeline. */
   static std::array<VkVertexInputAttributeDescription, 4>
   getAttributeDescriptions();
 };
 
+/**
+ * @struct VertexIndex
+ * @brief Holds indices for position, texture coordinate, and normal, along with
+ * the material name.
+ */
 struct VertexIndex {
   int v_idx = 0;
   int vt_idx = 0;
   int vn_idx = 0;
-
   std::string material_name = "";
 };
 
+/**
+ * @struct Triangle
+ * @brief Represents a face of a 3D model composed of 3 vertices.
+ */
 struct Triangle {
   VertexIndex vertices[3];
 };
 
+/**
+ * @struct Material
+ * @brief Stores material properties parsed from an MTL file.
+ */
 struct Material {
   std::string name;
   std::array<float, MATERIAL_ARR_SIZE> diffuse;
@@ -51,6 +79,10 @@ struct Material {
   std::string diffuse_map;
 };
 
+/**
+ * @enum ObjLineType
+ * @brief Enumeration of possible line types found in an OBJ file.
+ */
 enum class ObjLineType {
   VERTEX,
   TEXTURE_COORDINATE,
@@ -58,31 +90,33 @@ enum class ObjLineType {
   FACE,
   GROUP,
   OBJECT,
+  COMMENT,
   MATERIAL_LIBRARY,
   USE_MATERIAL,
-  COMMENT,
-  UNKNOWN,
+  UNKNOWN
 };
 
-constexpr double SCALE = 0.1;
-
+/**
+ * @class FileParser
+ * @brief Static utility class for loading and parsing .obj and .mtl files.
+ */
 class FileParser {
 public:
-  static void read_OBJ();
+  /** @brief Parses an OBJ file from the given file path. */
+  static void parse_OBJ(const char *filepath);
+
+  /** @brief Determines the line type based on its prefix. */
   static ObjLineType getLineType(std::string_view line) {
     if (line.empty())
       return ObjLineType::UNKNOWN;
-
     auto spacePos = line.find(' ');
     if (spacePos == std::string_view::npos)
       return ObjLineType::UNKNOWN;
-
     std::string_view prefix = line.substr(0, spacePos);
     auto it = prefixMap.find(prefix);
     return (it != prefixMap.end()) ? it->second : ObjLineType::UNKNOWN;
   }
 
-  static void parse_OBJ(const char *filepath);
   static std::map<std::string, std::vector<Triangle>> groupedTriangles;
   static std::vector<SubMesh> subMeshes;
 
@@ -108,4 +142,4 @@ private:
   static void assembleMeshes();
 };
 
-#endif
+#endif // FILE_PARSER_H

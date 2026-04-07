@@ -1,0 +1,67 @@
+DOXYFILE_ENCODING      = UTF-8
+PROJECT_NAME           = "Vulkan OBJ Previewer"
+PROJECT_BRIEF          = "Graphical app for previewing .obj files"
+OUTPUT_DIRECTORY       = 
+INPUT                  = include src
+RECURSIVE              = YES
+
+# --- Ignorování specifických souborů ---
+EXCLUDE_PATTERNS       = */._* ._*
+
+# --- Zpracování kódu a komentářů ---
+EXTRACT_ALL            = NO
+HIDE_UNDOC_MEMBERS     = YES
+HIDE_UNDOC_CLASSES     = YES
+HIDE_UNDOC_NAMESPACES  = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+EXTRACT_LOCAL_CLASSES  = NO
+SORT_MEMBER_DOCS       = YES
+GENERATE_TODOLIST      = YES
+
+# --- Procházení zdrojových kódů přímo na webu ---
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = YES
+STRIP_CODE_COMMENTS    = YES
+REFERENCES_LINK_SOURCE = YES
+
+# --- HTML výstup a vizuální ladění ---
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_COLORSTYLE        = AUTO_LIGHT
+HTML_DYNAMIC_MENUS     = YES
+HTML_DYNAMIC_SECTIONS  = YES
+HTML_CODE_FOLDING      = YES
+HTML_COPY_CLIPBOARD    = YES
+GENERATE_TREEVIEW      = YES
+TREEVIEW_WIDTH         = 250
+DISABLE_INDEX          = NO
+
+# --- Vypnutí formátů, které nepotřebujeme (zrychlí generování) ---
+GENERATE_LATEX         = NO
+GENERATE_RTF           = NO
+GENERATE_MAN           = NO
+GENERATE_XML           = NO
+GENERATE_DOCBOOK       = NO
+
+# --- Špičkové interaktivní grafy (Vyžaduje nainstalovaný Graphviz) ---
+HAVE_DOT               = YES
+DOT_IMAGE_FORMAT       = svg
+INTERACTIVE_SVG        = YES
+UML_LOOK               = YES
+UML_LIMIT_NUM_FIELDS   = 15
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = YES
+GROUP_GRAPHS           = YES
+INCLUDE_GRAPH          = YES
+INCLUDED_BY_GRAPH      = YES
+DIRECTORY_GRAPH        = YES
+
+# --- Call grafy - ukazuje, co volá danou funkci a co funkce sama volá ---
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+
+# --- Optimalizace grafů ---
+DOT_GRAPH_MAX_NODES    = 50
+MAX_DOT_GRAPH_DEPTH    = 0
+DOT_CLEANUP            = YES

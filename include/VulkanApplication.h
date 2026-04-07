@@ -1,3 +1,7 @@
+/**
+ * @file VulkanApplication.h
+ * @brief Core application class managing Vulkan API and the render loop.
+ */
 #ifndef VULKAN_APPLICATION_H
 #define VULKAN_APPLICATION_H
 
@@ -26,17 +30,33 @@ constexpr float farPlane = 50.f;
 
 constexpr int SHADOW_MAP_WIDTH_HEIGHT = 4096;
 
+/**
+ * @struct UniformBufferObject
+ * @brief Structure representing a uniform buffer object.
+ * @details Contains transformational matrices needed for computing vertex and
+ * normal positions inside a shader.
+ */
 struct UniformBufferObject {
-  glm::mat4 view;
-  glm::mat4 proj;
-  glm::mat4 model;
-  glm::mat4 normal;
+  glm::mat4 view;  ///< View matrix (camera)
+  glm::mat4 proj;  ///< Projection matrix
+  glm::mat4 model; ///< Model matrix, transforms an object into world space
+  glm::mat4
+      normal; ///< Normal matrix, for correct lighting during object movement
 };
 
+/**
+ * @class VulkanApplication
+ * @brief Main class which handles VulkanAPI calls and main render loop.
+ * @details Implemented as a Meyers singleton for safer memory management,
+ * encapsulates the vulkan calls into private methods and a few higher level
+ * public ones.
+ */
 class VulkanApplication {
 public:
-  // INFO: were creating the object dynamically so that when it terminates on
-  // macOS it doesnt cause a crash
+  /**
+   * @brief Retrieves the singleton instance of the VulkanApplication.
+   * @return Reference to the VulkanApplication instance.
+   */
   static VulkanApplication &getInstance() {
     static VulkanApplication *instance = new VulkanApplication();
     return *instance;
@@ -45,17 +65,41 @@ public:
   VulkanApplication(const VulkanApplication &) = delete;
   VulkanApplication &operator=(const VulkanApplication &) = delete;
 
+  /** @brief Toggles the rendering mode between solid polygons and wireframe. */
   static void toggleWireframe();
-  static void zoomIn();
-  static void zoomOut();
-  static void switchLightSourcePosition();
-  static void setZoomSpeed(double);
 
+  /** @brief Zooms the camera in. */
+  static void zoomIn();
+
+  /** @brief Zooms the camera out. */
+  static void zoomOut();
+
+  /** @brief Switches the position of the directional light source. */
+  static void switchLightSourcePosition();
+
+  /** * @brief Sets the speed multiplier for camera zooming.
+   * @param speed The new zoom speed value.
+   */
+  static void setZoomSpeed(double speed);
+
+  /** @brief Recreates vertex and index buffers (called when a new 3D model is
+   * loaded). */
   void recreateGeometryBuffers();
 
+  /** @brief Initializes the Vulkan API and required resources. */
   void initVulkan();
+
+  /** @brief Starts the main application and rendering loop. */
   void run();
+
+  /** @brief Releases all allocated Vulkan resources and destroys the context.
+   */
   void cleanup();
+
+  /** * @brief Retrieves the time elapsed between the current and previous
+   * frame.
+   * @return Constant reference to the delta time float.
+   */
   static const float &getDeltaTime();
 
   static bool renderWireframe;
@@ -113,6 +157,7 @@ private:
   VkShaderModule createShaderModule(const std::vector<char> &code);
   const VkViewport &getViewPortRef();
 
+  // Variables...
   VkRenderPass shadowRenderPass;
   VkImage shadowImage;
   VkDeviceMemory shadowMemory;
