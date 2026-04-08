@@ -101,6 +101,9 @@ enum class ObjLineType {
  * @brief Static utility class for loading and parsing .obj and .mtl files.
  */
 class FileParser {
+
+  friend class FileParserTest;
+
 public:
   /** @brief Parses an OBJ file from the given file path. */
   static void parse_OBJ(const char *filepath);

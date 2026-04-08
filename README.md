@@ -65,13 +65,31 @@ chmod +x compile-shaders.sh
 ### 3. Build with CMake
 ```bash
 mkdir build && cd build
-cmake ..
+cmake .. 
+cmake --build .
+```
+
+
+### 3.1 Build in debug mode (validation layers enabled)
+```bash
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Debug .. 
+cmake --build .
+```
+
+
+### 3.2 Build in release mode (validation layers disabled)
+```bash
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release .. 
 cmake --build .
 ```
 
 ## Usage & Controls
 
 Once built, run the executable. By default, the application will load a fallback model (e.g., teapot.obj).
+The default path of the executable is `build/VulkanApp.app/Contents/MacOS/VulkanApp` on macOS
+and `build/Debug/VulkanApp.exe`/`build/Release/VulkanApp.exe` on Windows depending on the build type
 
 ### Interaction
 * Rotate Camera: Click and drag the Left Mouse Button.
