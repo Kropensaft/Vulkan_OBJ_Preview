@@ -2,7 +2,7 @@ DOXYFILE_ENCODING      = UTF-8
 PROJECT_NAME           = "Vulkan OBJ Previewer"
 PROJECT_BRIEF          = "Graphical app for previewing .obj files"
 OUTPUT_DIRECTORY       = 
-INPUT                  = include src
+INPUT                  = ../include ../src
 RECURSIVE              = YES
 
 # --- Ignorování specifických souborů ---
