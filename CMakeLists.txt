@@ -117,4 +117,51 @@ elseif(WIN32)
 endif()
 
 
+enable_testing()
+
+include(FetchContent)
+
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG        v1.14.0
+)
+
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(googletest)
+add_executable(run_tests
+    tests/FileParserTest.cpp
+    tests/SortedMapTest.cpp
+    src/FileParser.cpp
+    src/VulkanApplication.cpp
+    src/Window.cpp
+    src/platforms/windows/menu_win.cpp
+    src/VulkanContext.cpp
+    src/DirectionalLight.cpp
+    src/CameraController.cpp
+    src/InputController.cpp
+)
+
+target_include_directories(run_tests PRIVATE include)
+
+target_link_libraries(run_tests 
+    PRIVATE 
+        gtest_main
+        Vulkan::Vulkan
+        glfw
+        glm::glm
+)
+if(APPLE)
+    target_sources(run_tests PRIVATE src/platforms/darwin/menu_darwin.mm)
+    target_link_libraries(run_tests PRIVATE ${COCOA_FRAMEWORK} ${FOUNDATION_FRAMEWORK})
+elseif(WIN32)
+    target_sources(run_tests PRIVATE src/platforms/windows/menu_win.cpp)
+    target_link_libraries(run_tests PRIVATE User32 Comdlg32)
+endif()
+
+include(GoogleTest)
+gtest_discover_tests(run_tests)
+
+
 	

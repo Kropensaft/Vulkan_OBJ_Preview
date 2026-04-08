@@ -19,7 +19,10 @@ A high-performance, cross-platform 3D model viewer built from scratch using the 
 * Wireframe Mode: Toggleable polygon rendering modes (Fill vs. Line) for geometry inspection.
 * Extensive Documentation: Fully documented codebase using Doxygen (with interactive UML and Call graphs).
 
-## Screenshots
+## Program Screenshots 
+![Example 1](documentation/screenshots/sc1.png)
+![Example 2](documentation/screenshots/sc2.png)
+![Example 3](documentation/screenshots/sc3.png)
 
 ## Prerequisites
 
@@ -53,7 +56,7 @@ scripts\dependencies_win.bat
 ```
 
 ### 2. Compile Shaders
-Vulkan consumes shaders in the SPIR-V bytecode format. Compile the GLSL shaders using the provided script:
+Vulkan consumes shaders in the SPIR-V bytecode format. Compile the GLSL shaders using the provided script or let CMake handle it post build:
 ```bash
 chmod +x compile-shaders.sh
 ./compile-shaders.sh
