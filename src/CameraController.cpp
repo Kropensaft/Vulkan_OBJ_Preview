@@ -62,7 +62,11 @@ void Camera::scrollCallback(GLFWwindow *window, double xoffset,
 
 void Camera::UpdateCamera(GLFWwindow *window, float xoffset, float yoffset,
                           float deltaTime) {
-  float sensitivity = 0.5f;
+#if defined(_WIN32)
+    float sensitivity = CONSTANTS::DEFAULT_WIN_SENSITIVITY;
+#else
+    float sensitivity = CONSTANTS::DEFAULT_SENSITIVITY;
+#endif
   float xAngle = xoffset * sensitivity * deltaTime;
   float yAngle = yoffset * sensitivity * deltaTime;
 

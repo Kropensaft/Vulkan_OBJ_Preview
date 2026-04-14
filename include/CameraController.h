@@ -78,7 +78,11 @@ public:
   inline double get_zoom_sensitivity() const;
 
 private:
-  double zoom_sensitivity = 10.0;
+#if defined(_WIN32)
+  double zoom_sensitivity = 1000.0;
+#else
+    double zoom_sensitivity = 10.0;
+#endif
   float xPos;
   float yPos;
   float yDeltaAngle;

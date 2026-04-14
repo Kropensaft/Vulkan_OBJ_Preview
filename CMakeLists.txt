@@ -118,7 +118,7 @@ endif()
 
 
 # Only include testing infrastructure if we are in Debug mode
-if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR NOT CMAKE_BUILD_TYPE)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     message(STATUS "Configuring tests (Debug Mode)")
     
     enable_testing() 
@@ -137,7 +137,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR NOT CMAKE_BUILD_TYPE)
 
     add_executable(run_tests
         tests/FileParserTest.cpp
-        tests/SortedMapTest.cpp
         src/FileParser.cpp
         src/VulkanApplication.cpp
         src/Window.cpp

@@ -22,6 +22,9 @@ constexpr int WIDTH = 1280;
 constexpr int HEIGHT = 720;
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
+constexpr double DEFAULT_WIN_SENSITIVITY = 20;
+constexpr double DEFAULT_SENSITIVITY = 5;
+
 // INFO: String literals
 constexpr char DEFAULT_OBJ_PATH[] = "../../../../assets/teapot.obj";
 constexpr char INITIAL_LIGHT[] = "Setting initial light direction to ";
