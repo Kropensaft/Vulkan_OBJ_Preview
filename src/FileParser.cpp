@@ -267,10 +267,9 @@ void FileParser::set_current_material(std::string &line) {
     if (materials.find(material_name) != materials.end()) {
       current_material = material_name;
     } else {
-      throw std::runtime_error(
-          std::format("Warning: OBJ requested material ', but it was not found "
-                      "in the MTL file.\n",
-                      material_name));
+      std::cerr << std::format(
+          "Warning: OBJ requested material '{}', but it was not found.\n",
+          material_name);
       current_material = "default";
     }
   }
@@ -434,6 +433,7 @@ void FileParser::parse_OBJ(const char *filePath) {
 
   FileParser::groupedTriangles.clear();
   FileParser::subMeshes.clear();
+  FileParser::materials.clear();
   temp_positions.clear();
   temp_normals.clear();
   temp_texcoords.clear();

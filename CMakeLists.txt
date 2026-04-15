@@ -25,6 +25,7 @@ list(FILTER SOURCES EXCLUDE REGEX "/\\._")
 # Create the executable target
 add_executable(${PROJECT_NAME} ${SOURCES})
 target_compile_definitions(VulkanApp PRIVATE ASSET_DIR="${CMAKE_SOURCE_DIR}/assets/")
+
  
 add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD
