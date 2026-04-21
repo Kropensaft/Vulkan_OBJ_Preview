@@ -165,7 +165,7 @@ struct DESCRIPTOR {
   ui DST_BIND : 1 = 1;
 };
 
-inline DESCRIPTOR descriptor_vals;
+constexpr inline DESCRIPTOR descriptor_vals;
 
 }; // namespace CONSTANTS
 
